@@ -1,0 +1,518 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+}
+
+:root {
+  /* Dark Mode Default Values */
+  --background: #0A0B0E;
+  --foreground: #F8F9FB;
+
+  --surface: #101216;
+  --surface-hover: #16191E;
+
+  --border: rgba(255, 255, 255, 0.03);
+
+  --primary: #7FE08A;
+  --primary-glow: rgba(127, 224, 138, 0.08);
+
+  --growing: #59C66E;
+  --thriving: #3DA953;
+
+  --launching: #D2A85A;
+
+  --frozen: #78BFFF;
+
+  --muted: #8E939E;
+  --muted-2: #5A606C;
+
+  /* Glass Variables */
+  --glass-bg: rgba(16, 18, 22, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.03);
+  --glass-shadow: rgba(0, 0, 0, 0.25);
+  --glass-inset-top: rgba(255, 255, 255, 0.02);
+  --glass-inset-bottom: rgba(255, 255, 255, 0.01);
+
+  --glass-premium-bg-1: rgba(12, 14, 18, 0.7);
+  --glass-premium-bg-2: rgba(18, 20, 26, 0.7);
+  --glass-premium-border: rgba(255, 255, 255, 0.04);
+  --glass-premium-shadow: rgba(0, 0, 0, 0.35);
+  --glass-premium-inset-top: rgba(255, 255, 255, 0.03);
+  --glass-premium-inset-bottom: rgba(255, 255, 255, 0.01);
+
+  /* Soft top-rim highlight for the double-bezel (dark) */
+  --bezel-highlight: rgba(255, 255, 255, 0.10);
+
+  /* Grove Core Orb (dark) */
+  --orb-1: #1A1E28;
+  --orb-2: #13161E;
+  --orb-3: #0A0C10;
+  --orb-ring: rgba(255, 255, 255, 0.10);
+  --orb-sheen: rgba(255, 255, 255, 0.05);
+  --orb-particle: rgba(255, 255, 255, 0.10);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.dark) {
+    /* Light Mode Overrides (System Preference) */
+    --background: #F8F9FA;
+    --foreground: #111318;
+
+    --surface: #FFFFFF;
+    --surface-hover: #F1F3F5;
+
+    --border: rgba(0, 0, 0, 0.03);
+
+    --primary: #1B6C30;
+    --primary-glow: rgba(27, 108, 48, 0.03);
+
+    --growing: #1E7E34;
+    --thriving: #145523;
+
+    --launching: #B0822E;
+
+    --frozen: #2D72B8;
+
+    --muted: #6C7A6C;
+    --muted-2: #8C9C8C;
+
+    /* Glass Variables */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.03);
+    --glass-shadow: rgba(0, 0, 0, 0.02);
+    --glass-inset-top: rgba(255, 255, 255, 0.5);
+    --glass-inset-bottom: rgba(255, 255, 255, 0.1);
+
+    --glass-premium-bg-1: rgba(255, 255, 255, 0.85);
+    --glass-premium-bg-2: rgba(248, 249, 250, 0.85);
+    --glass-premium-border: rgba(0, 0, 0, 0.04);
+    --glass-premium-shadow: rgba(0, 0, 0, 0.03);
+    --glass-premium-inset-top: rgba(255, 255, 255, 0.9);
+    --glass-premium-inset-bottom: rgba(255, 255, 255, 0.2);
+
+    /* Soft top-rim highlight for the double-bezel (light) */
+    --bezel-highlight: rgba(255, 255, 255, 0.55);
+
+    /* Grove Core Orb (light) */
+    --orb-1: #FFFFFF;
+    --orb-2: #F1F3F5;
+    --orb-3: #E7EAEE;
+    --orb-ring: rgba(0, 0, 0, 0.06);
+    --orb-sheen: rgba(255, 255, 255, 0.7);
+    --orb-particle: rgba(0, 0, 0, 0.04);
+  }
+}
+
+:root.light {
+  /* Light Mode Overrides (Manual Trigger) */
+  --background: #F8F9FA;
+  --foreground: #111318;
+
+  --surface: #FFFFFF;
+  --surface-hover: #F1F3F5;
+
+  --border: rgba(0, 0, 0, 0.03);
+
+  --primary: #1B6C30;
+  --primary-glow: rgba(27, 108, 48, 0.03);
+
+  --growing: #1E7E34;
+  --thriving: #145523;
+
+  --launching: #B0822E;
+
+  --frozen: #2D72B8;
+
+  --muted: #6C7A6C;
+  --muted-2: #8C9C8C;
+
+  /* Glass Variables */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.03);
+  --glass-shadow: rgba(0, 0, 0, 0.02);
+  --glass-inset-top: rgba(255, 255, 255, 0.5);
+  --glass-inset-bottom: rgba(255, 255, 255, 0.1);
+
+  --glass-premium-bg-1: rgba(255, 255, 255, 0.85);
+  --glass-premium-bg-2: rgba(248, 249, 250, 0.85);
+  --glass-premium-border: rgba(0, 0, 0, 0.04);
+  --glass-premium-shadow: rgba(0, 0, 0, 0.03);
+  --glass-premium-inset-top: rgba(255, 255, 255, 0.9);
+  --glass-premium-inset-bottom: rgba(255, 255, 255, 0.2);
+
+  /* Soft top-rim highlight for the double-bezel (light) */
+  --bezel-highlight: rgba(255, 255, 255, 0.55);
+
+  /* Grove Core Orb (light) */
+  --orb-1: #FFFFFF;
+  --orb-2: #F1F3F5;
+  --orb-3: #E7EAEE;
+  --orb-ring: rgba(0, 0, 0, 0.06);
+  --orb-sheen: rgba(255, 255, 255, 0.7);
+  --orb-particle: rgba(0, 0, 0, 0.04);
+}
+
+/* ---------- GLOWING MESH KEYFRAMES ---------- */
+@keyframes meshShift1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(15%, -20%) scale(1.15);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes meshShift2 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(-20%, 15%) scale(1.1);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.animate-mesh1 {
+  animation: meshShift1 18s ease-in-out infinite;
+}
+
+.animate-mesh2 {
+  animation: meshShift2 22s ease-in-out infinite;
+}
+
+/* ---------- GROVE ORB ---------- */
+@keyframes orbFloat {
+  0% {
+    transform: scale(1) translateY(0px);
+  }
+
+  50% {
+    transform: scale(1.05) translateY(-6px);
+  }
+
+  100% {
+    transform: scale(1) translateY(0px);
+  }
+}
+
+.animate-orbFloat {
+  animation: orbFloat 6s ease-in-out infinite;
+}
+
+@keyframes orbBreathe {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+
+  33% {
+    transform: translateY(-6px) scale(1.02) rotate(1.5deg);
+  }
+
+  66% {
+    transform: translateY(3px) scale(0.99) rotate(-1.5deg);
+  }
+
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-orbBreathe {
+  animation: orbBreathe 7s ease-in-out infinite;
+}
+
+@keyframes orbGlow {
+  0% {
+    opacity: 0.18;
+    transform: scale(0.95);
+  }
+
+  50% {
+    opacity: 0.45;
+    transform: scale(1.15);
+  }
+
+  100% {
+    opacity: 0.18;
+    transform: scale(0.95);
+  }
+}
+
+.animate-orbGlow {
+  animation: orbGlow 6s ease-in-out infinite;
+}
+
+@keyframes orbGlowDelay {
+  0% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.35;
+    transform: scale(1.25);
+  }
+
+  100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+}
+
+.animate-orbGlowDelay {
+  animation: orbGlowDelay 6s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+@keyframes orbPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+.animate-orbPulse {
+  animation: orbPulse 4s ease-in-out infinite;
+}
+
+@keyframes orbHighlight {
+  from {
+    transform: translateX(-25px) rotate(-15deg);
+  }
+
+  to {
+    transform: translateX(25px) rotate(-15deg);
+  }
+}
+
+.animate-orbHighlight {
+  animation: orbHighlight 8s ease-in-out infinite alternate;
+}
+
+@keyframes particle1 {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(6px, -8px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.animate-particle1 {
+  animation: particle1 5s ease-in-out infinite;
+}
+
+@keyframes particle2 {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(-8px, 6px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.animate-particle2 {
+  animation: particle2 6.5s ease-in-out infinite;
+}
+
+@keyframes particle3 {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-particle3 {
+  animation: particle3 4s ease-in-out infinite;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  overflow-x: hidden;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ethereal Glass Double-Bezel Utilities */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 10px 30px var(--glass-shadow),
+    inset 0 -1px 0 var(--glass-inset-bottom);
+}
+
+.glass-premium {
+  background: linear-gradient(135deg, var(--glass-premium-bg-1), var(--glass-premium-bg-2));
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  border: 1px solid var(--glass-premium-border);
+  box-shadow:
+    0 20px 50px var(--glass-premium-shadow),
+    inset 0 -1px 0 var(--glass-premium-inset-bottom);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 16px rgba(127, 224, 138, 0.12);
+}
+
+.glow-dim {
+  box-shadow: 0 0 25px 0 rgba(0, 0, 0, 0.65);
+}
+
+.glass-hover:hover {
+  background: rgba(16, 20, 28, 0.85);
+  border-color: rgba(127, 224, 138, 0.18);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45),
+    0 0 25px rgba(127, 224, 138, 0.08);
+}
+
+.glow-world {
+  box-shadow:
+    0 0 20px rgba(127, 224, 138, 0.15),
+    0 0 45px rgba(127, 224, 138, 0.05);
+}
+
+.glow-frozen {
+  box-shadow: 0 0 20px rgba(120, 191, 255, 0.12);
+}
+
+/* Hide scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseSlow {
+
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(1.03);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 5s ease-in-out infinite;
+}
+
+.transition-premium {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Ethereal double-bezel.
+ * Replaces the hard 1px white top-edge (which read as a flat white border)
+ * with a soft, gradient-masked highlight that fades out toward the sides —
+ * the light catches the top rim, not the whole perimeter.
+ */
+.glass-bezel {
+  position: relative;
+  isolation: isolate;
+}
+
+.glass-bezel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(180deg,
+      var(--bezel-highlight, rgba(255, 255, 255, 0.12)) 0%,
+      transparent 45%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
