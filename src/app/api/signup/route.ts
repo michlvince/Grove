@@ -59,8 +59,9 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !user) {
+      console.error("[signup] insert failed:", error);
       return NextResponse.json(
-        { error: "Could not create account. Please try again." },
+        { error: error?.message || "Could not create account. Please try again." },
         { status: 500 }
       );
     }
