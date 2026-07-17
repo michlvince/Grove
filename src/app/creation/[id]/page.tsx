@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ProductionTab from "@/components/features/ProductionTab";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -56,28 +57,60 @@ function AudioPlayer({ content }: { content: string }) {
     if (!isRealAudio) return;
 
     const audio = new Audio(content);
+    audio.preload = "metadata";
     audioRef.current = audio;
 
-    const onLoadedMetadata = () => setTotalDuration(audio.duration);
+    // MediaRecorder WebM blobs often report duration as Infinity because the
+    // stream has no duration metadata. Force the browser to compute the real
+    // duration by seeking to the end, then resetting to the start.
+    const fixInfiniteDuration = () => {
+      if (audio.duration === Infinity || isNaN(audio.duration)) {
+        const onSeeked = () => {
+          audio.removeEventListener("seeked", onSeeked);
+          audio.currentTime = 0;
+          setTotalDuration(audio.duration);
+        };
+        audio.addEventListener("seeked", onSeeked);
+        audio.currentTime = 1e101; // jump past the end to trigger duration calc
+      } else {
+        setTotalDuration(audio.duration);
+      }
+    };
+
+    const onLoadedMetadata = () => fixInfiniteDuration();
+    const onDurationChange = () => {
+      if (audio.duration !== Infinity && !isNaN(audio.duration)) {
+        setTotalDuration(audio.duration);
+      }
+    };
     const onTimeUpdate = () => {
+      const dur = audio.duration;
       setCurrentTime(audio.currentTime);
-      setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
+      setProgress(dur && dur !== Infinity ? (audio.currentTime / dur) * 100 : 0);
     };
     const onEnded = () => {
       setIsPlaying(false);
       setProgress(0);
       setCurrentTime(0);
     };
+    const onError = () => {
+      console.error("Audio playback error:", audio.error);
+      setIsPlaying(false);
+    };
 
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("durationchange", onDurationChange);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
 
     return () => {
       audio.pause();
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
     };
   }, [content, isRealAudio]);
 
@@ -109,19 +142,34 @@ function AudioPlayer({ content }: { content: string }) {
     if (isRealAudio && audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => setIsPlaying(true))
+            .catch((err) => {
+              console.error("Unable to play audio:", err);
+              setIsPlaying(false);
+            });
+        } else {
+          setIsPlaying(true);
+        }
       }
+    } else {
+      // Simulated stub playback
+      setIsPlaying(!isPlaying);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isRealAudio || !audioRef.current) return;
+    const dur = audioRef.current.duration;
+    if (!dur || dur === Infinity || isNaN(dur)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    audioRef.current.currentTime = ratio * audioRef.current.duration;
+    audioRef.current.currentTime = ratio * dur;
     setProgress(ratio * 100);
   };
 
@@ -251,6 +299,7 @@ export default function CreationDetail({ params }: PageProps) {
 
   const [mounted, setMounted] = useState(false);
   const [inputText, setInputText] = useState("");
+  const [activeTab, setActiveTab] = useState<"timeline" | "production">("timeline");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showAttachDrawer, setShowAttachDrawer] = useState(false);
@@ -296,7 +345,24 @@ export default function CreationDetail({ params }: PageProps) {
       streamRef.current = stream;
       audioChunksRef.current = [];
 
-      const recorder = new MediaRecorder(stream);
+      // Pick a mime type the browser actually supports so the recorded blob
+      // and the stored data URL agree on format.
+      const preferredTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+      const mimeType =
+        preferredTypes.find(
+          (t) =>
+            typeof MediaRecorder !== "undefined" &&
+            MediaRecorder.isTypeSupported(t)
+        ) || "";
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -318,7 +384,9 @@ export default function CreationDetail({ params }: PageProps) {
 
     if (recorder && recorder.state !== "inactive") {
       recorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
         const reader = new FileReader();
         reader.onloadend = () => {
           const dataUrl = reader.result as string;
@@ -510,7 +578,34 @@ export default function CreationDetail({ params }: PageProps) {
           </div>
         </div>
 
+        {/* ── Tab Switcher ───────────────────────────────────────── */}
+        <div className="flex bg-surface border border-border p-1 rounded-xl mt-1">
+          <button
+            onClick={() => setActiveTab("timeline")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-premium ${
+              activeTab === "timeline"
+                ? "bg-background text-emerald-400 border border-border"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Timeline
+          </button>
+          <button
+            onClick={() => setActiveTab("production")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-premium ${
+              activeTab === "production"
+                ? "bg-background text-emerald-400 border border-border"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Production
+          </button>
+        </div>
+
+        {activeTab === "production" && <ProductionTab creationId={creationId} />}
+
         {/* ── Timeline Content ───────────────────────────────────── */}
+        {activeTab === "timeline" && (
         <div className="flex-1 overflow-y-auto py-4 pr-1 space-y-4 no-scrollbar">
           {creation.entries.length === 0 ? (
             <div className="py-16 text-center space-y-2">
@@ -597,6 +692,7 @@ export default function CreationDetail({ params }: PageProps) {
             </div>
           )}
         </div>
+        )}
 
         {/* ── Attach Drawer ──────────────────────────────────────── */}
         {showAttachDrawer && (

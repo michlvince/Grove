@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { StateProvider } from "@/context/StateContext";
-import { NotificationProvider } from "@/context/NotificationContext";
+import Providers from "@/components/Providers";
 import Shell from "@/components/layout/Shell";
 
 import { Instrument_Sans } from "next/font/google";
@@ -54,11 +53,9 @@ export default function RootLayout({
       <body
         className={`${instrument.className} min-h-full flex flex-col bg-background text-foreground antialiased`}
       >
-        <StateProvider>
-          <NotificationProvider>
-            <Shell>{children}</Shell>
-          </NotificationProvider>
-        </StateProvider>
+        <Providers>
+          <Shell>{children}</Shell>
+        </Providers>
       </body>
     </html>
   );

@@ -1,471 +1,194 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
+import type {
+  Creation,
+  CreationStatus,
+  DumpItem,
+  Entry,
+} from "@/types/domain";
 
-// --- TYPES ---
-
-export type CreationStatus =
-  | "Seed"
-  | "Growing"
-  | "Thriving"
-  | "Frozen"
-  | "Launching"
-  | "Shipped";
-
-export interface Entry {
-  id: string;
-  type: "text" | "image" | "link" | "audio";
-  content: string;
-  timestamp: string; // ISO string
-}
-
-export interface Creation {
-  id: string;
-  title: string;
-  worldId: string; // matches WorldId
-  originalWorldId?: string; // stores world before it was dumped
-  status: CreationStatus;
-  createdAt: string; // ISO string
-  updatedAt: string; // ISO string (last activity)
-  entries: Entry[];
-}
-
-export interface DumpItem {
-  id: string;
-  content: string;
-  createdAt: string; // ISO string
-}
+// Re-export shared types + worlds so existing imports keep working.
+export type { Creation, CreationStatus, DumpItem, Entry } from "@/types/domain";
+export { DEFAULT_WORLDS } from "@/lib/worlds";
+export type { World, WorldId } from "@/lib/worlds";
 
 export interface UserProfile {
   name: string;
-  title: string; // default "Traveler"
+  title: string;
   joinedAt: string;
   role?: "user" | "admin";
 }
 
-export type WorldId =
-  | "product"
-  | "design"
-  | "writing"
-  | "music"
-  | "games"
-  | "business"
-  | "personal"
-  | "dump";
-
-export interface World {
-  id: WorldId;
-  name: string;
-  icon: string;
-  description: string;
-}
-
-// --- DEFAULT WORLDS ---
-
-export const DEFAULT_WORLDS: World[] = [
-  { id: "product", name: "Product", icon: "Boxes", description: "Apps, services, physical goods, and digital creations." },
-  { id: "design", name: "Design", icon: "Palette", description: "UI, layouts, branding, art, and visual concepts." },
-  { id: "writing", name: "Writing", icon: "PenTool", description: "Essays, stories, documentation, scripts, and logs." },
-  { id: "music", name: "Music", icon: "Music", description: "Beats, lyrics, melodies, soundscapes, and tracks." },
-  { id: "games", name: "Games", icon: "Gamepad2", description: "Mechanics, levels, lore, rules, and game ideas." },
-  { id: "business", name: "Business", icon: "TrendingUp", description: "Ventures, models, strategies, marketing, and monetization." },
-  { id: "personal", name: "Personal", icon: "User", description: "Habits, goals, reminders, journals, and reflections." },
-  { id: "dump", name: "The Dump", icon: "Trash2", description: "A fertile soil for uncategorized thoughts and sleeping ideas." },
-];
-
 interface StateContextType {
   user: UserProfile | null;
-  saveUser: (name: string, title?: string, role?: "user" | "admin") => void;
   creations: Creation[];
-  addCreation: (title: string, worldId: string, initialContent?: string) => Creation;
-  updateCreationStatus: (id: string, status: CreationStatus) => void;
-  addEntry: (creationId: string, type: "text" | "image" | "link" | "audio", content: string) => void;
-  deleteCreation: (id: string) => void;
   dumpItems: DumpItem[];
-  addDumpItem: (content: string) => void;
-  deleteDumpItem: (id: string) => void;
-  reviveDumpItem: (id: string, title: string, worldId: string) => Creation;
-  reviveDumpCreation: (creationId: string, worldId: string) => void;
-  unearthRandom: () => { type: "raw" | "creation"; item: DumpItem | Creation } | null;
-  timeTravel: (creationId: string, daysAgo: number) => void;
-  seedMockData: () => void;
-  adminResetAllData: () => void;
   isLoaded: boolean;
+  refresh: () => Promise<void>;
+  addCreation: (title: string, worldId: string, initialContent?: string) => Promise<Creation | null>;
+  updateCreationStatus: (id: string, status: CreationStatus) => Promise<void>;
+  addEntry: (creationId: string, type: Entry["type"], content: string) => Promise<void>;
+  deleteCreation: (id: string) => Promise<void>;
+  addDumpItem: (content: string) => Promise<void>;
+  deleteDumpItem: (id: string) => Promise<void>;
+  reviveDumpItem: (id: string, title: string, worldId: string) => Promise<Creation | null>;
+  reviveDumpCreation: (creationId: string, worldId: string) => Promise<void>;
+  unearthRandom: () => { type: "raw" | "creation"; item: DumpItem | Creation } | null;
 }
 
 const StateContext = createContext<StateContextType | undefined>(undefined);
 
 export function StateProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const { data: session, status } = useSession();
   const [creations, setCreations] = useState<Creation[]>([]);
   const [dumpItems, setDumpItems] = useState<DumpItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load state on mount
-  useEffect(() => {
-    const localUser = localStorage.getItem("grove_user");
-    const localCreations = localStorage.getItem("grove_creations");
-    const localDump = localStorage.getItem("grove_dump_items");
+  const user: UserProfile | null = session?.user
+    ? {
+        name: session.user.name ?? "Traveler",
+        title: session.user.title ?? "Traveler",
+        joinedAt: "",
+        role: session.user.role,
+      }
+    : null;
 
-    if (localUser) setUser(JSON.parse(localUser));
-    if (localCreations) {
-      const parsedCreations: Creation[] = JSON.parse(localCreations);
-      setCreations(parsedCreations);
+  const refresh = useCallback(async () => {
+    if (status !== "authenticated") return;
+    try {
+      const res = await fetch("/api/creations", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setCreations(data.creations ?? []);
+        setDumpItems(data.dumpItems ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to load Grove data:", err);
+    } finally {
+      setIsLoaded(true);
     }
-    if (localDump) setDumpItems(JSON.parse(localDump));
+  }, [status]);
 
-    setIsLoaded(true);
-  }, []);
-
-  // Run dormancy checks when creations or time changes (runs on load and updates)
   useEffect(() => {
-    if (!isLoaded) return;
-
-    let changed = false;
-    const now = new Date();
-
-    const checkedCreations = creations.map((c) => {
-      // Shipped items don't freeze or dump - they are completed
-      if (c.status === "Shipped") return c;
-
-      const updatedAt = new Date(c.updatedAt);
-      const diffTime = Math.abs(now.getTime() - updatedAt.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-
-      // 90 days: move to dump if not already in dump
-      if (diffDays >= 90 && c.worldId !== "dump") {
-        changed = true;
-        return {
-          ...c,
-          originalWorldId: c.worldId, // save where it came from
-          worldId: "dump",
-          updatedAt: now.toISOString(), // reset updated to avoid immediate double process
-        };
-      }
-
-      return c;
-    });
-
-    if (changed) {
-      setCreations(checkedCreations);
-      localStorage.setItem("grove_creations", JSON.stringify(checkedCreations));
+    if (status === "loading") return;
+    if (status === "unauthenticated") {
+      setCreations([]);
+      setDumpItems([]);
+      setIsLoaded(true);
+      return;
     }
-  }, [creations, isLoaded]);
+    refresh();
+  }, [status, refresh]);
 
-  // Save state helpers
-  const saveUser = (name: string, title: string = "Traveler", role: "user" | "admin" = "user") => {
-    const newUser: UserProfile = {
-      name,
-      title: role === "admin" ? "Administrator" : title,
-      joinedAt: new Date().toISOString(),
-      role,
-    };
-    setUser(newUser);
-    localStorage.setItem("grove_user", JSON.stringify(newUser));
-  };
-
-  const saveCreationsToLocalStorage = (updated: Creation[]) => {
-    setCreations(updated);
-    localStorage.setItem("grove_creations", JSON.stringify(updated));
-  };
-
-  const saveDumpToLocalStorage = (updated: DumpItem[]) => {
-    setDumpItems(updated);
-    localStorage.setItem("grove_dump_items", JSON.stringify(updated));
-  };
-
-  // --- ACTIONS ---
-
-  const addCreation = (title: string, worldId: string, initialContent?: string) => {
-    const now = new Date().toISOString();
-    const newCreation: Creation = {
-      id: "creation_" + Math.random().toString(36).substr(2, 9),
-      title,
-      worldId,
-      status: "Seed",
-      createdAt: now,
-      updatedAt: now,
-      entries: initialContent
-        ? [
-            {
-              id: "entry_" + Math.random().toString(36).substr(2, 9),
-              type: "text",
-              content: initialContent,
-              timestamp: now,
-            },
-          ]
-        : [],
-    };
-
-    const updated = [newCreation, ...creations];
-    saveCreationsToLocalStorage(updated);
-    return newCreation;
-  };
-
-  const updateCreationStatus = (id: string, status: CreationStatus) => {
-    const updated = creations.map((c) => {
-      if (c.id === id) {
-        return {
-          ...c,
-          status,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return c;
+  const addCreation = async (title: string, worldId: string, initialContent?: string) => {
+    const res = await fetch("/api/creations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, worldId, initialContent }),
     });
-    saveCreationsToLocalStorage(updated);
+    if (!res.ok) return null;
+    const { creation } = await res.json();
+    setCreations((prev) => [creation, ...prev]);
+    return creation as Creation;
   };
 
-  const addEntry = (creationId: string, type: "text" | "image" | "link" | "audio", content: string) => {
-    const now = new Date().toISOString();
-    const newEntry: Entry = {
-      id: "entry_" + Math.random().toString(36).substr(2, 9),
-      type,
-      content,
-      timestamp: now,
-    };
-
-    const updated = creations.map((c) => {
-      if (c.id === creationId) {
-        // If it was in the dump and user adds a new entry, we restore it to its original world (or general)
-        let worldId = c.worldId;
-        if (worldId === "dump") {
-          worldId = c.originalWorldId || "personal";
-        }
-        
-        // Auto progress status to "Growing" if it's currently "Seed"
-       let nextStatus = c.status;
-
-if (
-  c.status === "Seed" ||
-  c.status === "Frozen"
-) {
-  nextStatus = "Growing";
-}
-
-        return {
-          ...c,
-          worldId,
-          status: nextStatus as CreationStatus,
-          updatedAt: now,
-          entries: [...c.entries, newEntry],
-        };
-      }
-      return c;
+  const updateCreationStatus = async (id: string, statusValue: CreationStatus) => {
+    await fetch(`/api/creations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateStatus", status: statusValue }),
     });
-    saveCreationsToLocalStorage(updated);
+    setCreations((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, status: statusValue, updatedAt: new Date().toISOString() } : c
+      )
+    );
   };
 
-  const deleteCreation = (id: string) => {
-    const updated = creations.filter((c) => c.id !== id);
-    saveCreationsToLocalStorage(updated);
+  const addEntry = async (creationId: string, type: Entry["type"], content: string) => {
+    await fetch(`/api/creations/${creationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "addEntry", type, content }),
+    });
+    // Re-fetch to reflect server-side status/world transitions.
+    await refresh();
   };
 
-  const addDumpItem = (content: string) => {
-    const newItem: DumpItem = {
-      id: "dump_" + Math.random().toString(36).substr(2, 9),
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newItem, ...dumpItems];
-    saveDumpToLocalStorage(updated);
+  const deleteCreation = async (id: string) => {
+    await fetch(`/api/creations/${id}`, { method: "DELETE" });
+    setCreations((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const deleteDumpItem = (id: string) => {
-    const updated = dumpItems.filter((item) => item.id !== id);
-    saveDumpToLocalStorage(updated);
+  const addDumpItem = async (content: string) => {
+    const res = await fetch("/api/dump", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (res.ok) {
+      const { item } = await res.json();
+      setDumpItems((prev) => [item, ...prev]);
+    }
   };
 
-  const reviveDumpItem = (id: string, title: string, worldId: string) => {
+  const deleteDumpItem = async (id: string) => {
+    await fetch(`/api/dump?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    setDumpItems((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const reviveDumpItem = async (id: string, title: string, worldId: string) => {
     const item = dumpItems.find((d) => d.id === id);
-    const content = item ? item.content : "";
-    
-    // Create new creation
-    const newCreation = addCreation(title, worldId, content);
-    
-    // Remove from dump list
-    deleteDumpItem(id);
-    return newCreation;
+    const created = await addCreation(title, worldId, item?.content ?? "");
+    await deleteDumpItem(id);
+    return created;
   };
 
-  const reviveDumpCreation = (creationId: string, worldId: string) => {
-    const updated = creations.map((c) => {
-      if (c.id === creationId) {
-        return {
-          ...c,
-          worldId,
-          updatedAt: new Date().toISOString(),
-          status: "Seed" as CreationStatus, // reset to Seed
-        };
-      }
-      return c;
+  const reviveDumpCreation = async (creationId: string, worldId: string) => {
+    await fetch(`/api/creations/${creationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateStatus", status: "Seed" }),
     });
-    saveCreationsToLocalStorage(updated);
+    // world change happens on next entry; optimistically reflect status + world
+    setCreations((prev) =>
+      prev.map((c) =>
+        c.id === creationId ? { ...c, worldId, status: "Seed" as CreationStatus } : c
+      )
+    );
+    await refresh();
   };
 
-  const unearthRandom = (): { type: "raw" | "creation"; item: DumpItem | Creation } | null => {
-    const totalItems = dumpItems.length;
+  const unearthRandom = () => {
     const dumpedCreations = creations.filter((c) => c.worldId === "dump");
-    const totalCreations = dumpedCreations.length;
-    const total = totalItems + totalCreations;
-
+    const total = dumpItems.length + dumpedCreations.length;
     if (total === 0) return null;
-
-    const randomIndex = Math.floor(Math.random() * total);
-
-    if (randomIndex < totalItems) {
-      return { type: "raw" as const, item: dumpItems[randomIndex] };
-    } else {
-      return { type: "creation" as const, item: dumpedCreations[randomIndex - totalItems] };
+    const idx = Math.floor(Math.random() * total);
+    if (idx < dumpItems.length) {
+      return { type: "raw" as const, item: dumpItems[idx] };
     }
-  };
-
-  // Time travel function to mock the date for dormancy testing
-  const timeTravel = (creationId: string, daysAgo: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
-
-    const updated = creations.map((c) => {
-      if (c.id === creationId) {
-        return {
-          ...c,
-          updatedAt: date.toISOString(),
-        };
-      }
-      return c;
-    });
-    
-    // Update local state directly so it recalculates instantly
-    setCreations(updated);
-    localStorage.setItem("grove_creations", JSON.stringify(updated));
-  };
-
-  const seedMockData = () => {
-    const now = new Date();
-    const makeId = (prefix: string) => prefix + "_" + Math.random().toString(36).substr(2, 9);
-    
-    const mockCreations: Creation[] = [
-      {
-        id: makeId("creation"),
-        title: "Grove Creative Dashboard",
-        worldId: "product",
-        status: "Growing",
-        createdAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        entries: [
-          {
-            id: makeId("entry"),
-            type: "text",
-            content: "Initial idea: Create a virtual garden for tracking half-baked thoughts and creations, with worlds representing categories.",
-            timestamp: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: makeId("entry"),
-            type: "text",
-            content: "Added local storage persistence and built the side panel navigation layout.",
-            timestamp: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      },
-      {
-        id: makeId("creation"),
-        title: "Ethereal Glass Design Tokens",
-        worldId: "design",
-        status: "Thriving",
-        createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(),
-        entries: [
-          {
-            id: makeId("entry"),
-            type: "text",
-            content: "Exploring frosted borders, dark background glows, and emerald themes for premium aesthetic feel.",
-            timestamp: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      },
-      {
-        id: makeId("creation"),
-        title: "Ecosystem Simulator Engine",
-        worldId: "games",
-        status: "Seed",
-        createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        entries: [
-          {
-            id: makeId("entry"),
-            type: "text",
-            content: "A text-based simulation where creations grow organically like trees based on writing frequency.",
-            timestamp: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      },
-      {
-        id: makeId("creation"),
-        title: "Daily Habit Reflections",
-        worldId: "personal",
-        status: "Frozen",
-        createdAt: new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000).toISOString(),
-        entries: [
-          {
-            id: makeId("entry"),
-            type: "text",
-            content: "Reflecting on creative output and consistency. Need to build a routine around small captures.",
-            timestamp: new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      }
-    ];
-
-    const mockDumpItems: DumpItem[] = [
-      {
-        id: makeId("dump"),
-        content: "Random thought: What if music playlists had seasonal decay where songs fade unless re-listened?",
-        createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: makeId("dump"),
-        content: "SaaS idea: A newsletter platform where subscribers can vote on the next article topic directly from the email client.",
-        createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString()
-      }
-    ];
-
-    saveCreationsToLocalStorage(mockCreations);
-    saveDumpToLocalStorage(mockDumpItems);
-  };
-
-  const adminResetAllData = () => {
-    setUser(null);
-    setCreations([]);
-    setDumpItems([]);
-    localStorage.removeItem("grove_user");
-    localStorage.removeItem("grove_creations");
-    localStorage.removeItem("grove_dump_items");
-    localStorage.removeItem("grove_notifications_enabled");
-    localStorage.removeItem("grove_notifications_interval");
+    return { type: "creation" as const, item: dumpedCreations[idx - dumpItems.length] };
   };
 
   return (
     <StateContext.Provider
       value={{
         user,
-        saveUser,
         creations,
+        dumpItems,
+        isLoaded,
+        refresh,
         addCreation,
         updateCreationStatus,
         addEntry,
         deleteCreation,
-        dumpItems,
         addDumpItem,
         deleteDumpItem,
         reviveDumpItem,
         reviveDumpCreation,
         unearthRandom,
-        timeTravel,
-        seedMockData,
-        adminResetAllData,
-        isLoaded,
       }}
     >
       {children}

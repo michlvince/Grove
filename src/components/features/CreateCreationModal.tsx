@@ -28,12 +28,13 @@ export default function CreateCreationModal({
   // Filter out 'The Dump' from target worlds when creating a new idea
   const targetWorlds = DEFAULT_WORLDS.filter((w) => w.id !== "dump");
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    // Create creation in state
-    const newCreation = addCreation(title.trim(), worldId, ideaContent);
+    // Create creation in the database
+    const newCreation = await addCreation(title.trim(), worldId, ideaContent);
+    if (!newCreation) return;
 
     // Reset, clear, redirect
     setTitle("");
@@ -42,8 +43,8 @@ export default function CreateCreationModal({
     router.push(`/creation/${newCreation.id}`);
   };
 
-  const handleSendToDump = () => {
-    addDumpItem(ideaContent);
+  const handleSendToDump = async () => {
+    await addDumpItem(ideaContent);
     onClearInput();
     onClose();
   };

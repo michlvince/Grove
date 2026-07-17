@@ -68,14 +68,15 @@ export default function WorldDetails({ params }: PageProps) {
   const worldCreations = creations.filter((c) => c.worldId === worldId);
   const Icon = iconMap[world.icon] || Boxes;
 
-  const handleQuickPlant = (e: React.FormEvent) => {
+  const handleQuickPlant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
 
     // Add creation directly to this world
-    const newCreation = addCreation(quickTitle.trim(), worldId);
+    const newCreation = await addCreation(quickTitle.trim(), worldId);
     setQuickTitle("");
-    
+    if (!newCreation) return;
+
     // Redirect to the new creation detail page
     router.push(`/creation/${newCreation.id}`);
   };

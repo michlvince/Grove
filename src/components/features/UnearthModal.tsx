@@ -46,18 +46,18 @@ export default function UnearthModal({ isOpen, onClose }: UnearthModalProps) {
     }
   };
 
-  const handleReviveSubmit = (e: React.FormEvent) => {
+  const handleReviveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeItem) return;
 
     if (activeItem.type === "raw") {
       if (!title.trim()) return;
-      const newCreation = reviveDumpItem(activeItem.item.id, title.trim(), worldId);
+      const newCreation = await reviveDumpItem(activeItem.item.id, title.trim(), worldId);
       onClose();
-      router.push(`/creation/${newCreation.id}`);
+      if (newCreation) router.push(`/creation/${newCreation.id}`);
     } else {
       // Creation
-      reviveDumpCreation(activeItem.item.id, worldId);
+      await reviveDumpCreation(activeItem.item.id, worldId);
       onClose();
       router.push(`/creation/${activeItem.item.id}`);
     }

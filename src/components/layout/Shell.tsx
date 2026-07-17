@@ -3,21 +3,24 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home as HomeIcon, Globe, Trash2, Clock, Sparkles, User, Sun, Moon, Bell } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Home as HomeIcon, Globe, Trash2, Sparkles, User, Sun, Moon, Bell, Shield, HelpCircle, LogOut } from "lucide-react";
 import { useAppState } from "@/context/StateContext";
 import { useNotifications } from "@/context/NotificationContext";
-import TimeTravelDebug from "../features/TimeTravelDebug";
-import Onboarding from "../features/Onboarding";
+import TutorialModal from "../features/TutorialModal";
 
 interface ShellProps {
   children: React.ReactNode;
 }
 
+// Routes that render without the app chrome (their own full-screen layout).
+const BARE_ROUTES = ["/signin", "/signup"];
+
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
   const { user, isLoaded } = useAppState();
-  const [showDebugger, setShowDebugger] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   const {
@@ -40,6 +43,18 @@ export default function Shell({ children }: ShellProps) {
     }
   }, []);
 
+  // Show the tutorial automatically the first time a signed-in user arrives.
+  useEffect(() => {
+    if (user && !localStorage.getItem("grove_tutorial_seen")) {
+      setShowTutorial(true);
+    }
+  }, [user]);
+
+  const closeTutorial = () => {
+    localStorage.setItem("grove_tutorial_seen", "true");
+    setShowTutorial(false);
+  };
+
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
@@ -47,6 +62,11 @@ export default function Shell({ children }: ShellProps) {
     document.documentElement.classList.remove("light", "dark");
     document.documentElement.classList.add(newTheme);
   };
+
+  // Auth pages render bare, without the app chrome.
+  if (BARE_ROUTES.includes(pathname)) {
+    return <>{children}</>;
+  }
 
   if (!isLoaded) {
     return (
@@ -61,9 +81,10 @@ Preparing your Grove...
     );
   }
 
-  // If user is not onboarded, show onboarding overlay
+  // Unauthenticated users are redirected to /signin by middleware; render nothing
+  // in the brief interim to avoid flashing the app chrome.
   if (!user) {
-    return <Onboarding />;
+    return null;
   }
 
   const isActive = (path: string) => {
@@ -150,20 +171,36 @@ Preparing your Grove...
             <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-500">{theme}</span>
           </button>
 
-          {/* Time Travel Trigger */}
+          {/* Admin dashboard (admins only) */}
+          {user.role === "admin" && (
+            <Link
+              href="/admin"
+              className={`w-full py-2 px-3.5 rounded-xl border flex items-center justify-between transition-premium text-xs ${
+                isActive("/admin")
+                  ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
+                  : "bg-background border-border text-muted hover:text-foreground"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                <span>Admin</span>
+              </span>
+              <span className="text-[10px] bg-surface-hover text-emerald-500 px-1.5 py-0.5 rounded uppercase font-bold">Analytics</span>
+            </Link>
+          )}
+
+          {/* Help / Tutorial */}
           <button
-            onClick={() => setShowDebugger(!showDebugger)}
-            className={`w-full py-2 px-3.5 rounded-xl border flex items-center justify-between transition-premium text-xs ${
-              showDebugger
-                ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
-                : "bg-background border-border text-muted hover:text-foreground"
-            }`}
+            onClick={() => setShowTutorial(true)}
+            className="w-full py-2 px-3.5 rounded-xl border bg-background border-border text-muted hover:text-foreground flex items-center justify-between transition-premium text-xs"
           >
             <span className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>Debugger</span>
+              <HelpCircle className="w-4 h-4" />
+              <span>Tutorial</span>
             </span>
-            <span className="text-[10px] bg-surface-hover text-muted px-1.5 py-0.5 rounded">Active</span>
+            <Link href="/help" className="text-[10px] text-emerald-500 hover:underline" onClick={(e) => e.stopPropagation()}>
+              Guide
+            </Link>
           </button>
 
           {/* Notifications Toggle/Settings */}
@@ -237,7 +274,14 @@ Preparing your Grove...
           {/* Profile */}
           <div className="flex items-center gap-2.5 bg-background border border-border py-2 px-3.5 rounded-xl text-xs text-foreground font-medium">
             <User className="w-4 h-4 text-emerald-500" />
-            <span className="truncate">{user.name}</span>
+            <span className="truncate flex-1">{user.name}</span>
+            <button
+              onClick={() => signOut({ callbackUrl: "/signin" })}
+              title="Sign out"
+              className="text-muted hover:text-red-400 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </aside>
@@ -279,14 +323,33 @@ Preparing your Grove...
             </button>
 
             <button
-              onClick={() => setShowDebugger(!showDebugger)}
-              className={`p-2 rounded-full border transition-premium ${
-                showDebugger
-                  ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
-                  : "bg-surface border-border text-muted hover:text-foreground"
-              }`}
+              onClick={() => setShowTutorial(true)}
+              className="p-2 rounded-full border bg-surface border-border text-muted hover:text-foreground transition-premium"
+              title="Tutorial"
             >
-              <Clock className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4" />
+            </button>
+
+            {user.role === "admin" && (
+              <Link
+                href="/admin"
+                className={`p-2 rounded-full border transition-premium ${
+                  isActive("/admin")
+                    ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
+                    : "bg-surface border-border text-muted hover:text-foreground"
+                }`}
+                title="Admin"
+              >
+                <Shield className="w-4 h-4" />
+              </Link>
+            )}
+
+            <button
+              onClick={() => signOut({ callbackUrl: "/signin" })}
+              className="p-2 rounded-full border bg-surface border-border text-muted hover:text-red-400 transition-premium"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-1.5 bg-surface border border-border py-1 px-2.5 rounded-full text-xs text-foreground font-medium">
@@ -351,12 +414,8 @@ Preparing your Grove...
           </div>
         )}
 
-        {/* Time-Travel Debugger Drawer */}
-        {showDebugger && (
-          <div className="z-50 bg-surface border-b border-[#7FE08A]/30 animate-fade-in sticky top-[61px] md:top-0">
-            <TimeTravelDebug onClose={() => setShowDebugger(false)} />
-          </div>
-        )}
+        {/* Tutorial Modal */}
+        {showTutorial && <TutorialModal onClose={closeTutorial} />}
 
         {/* Main Content Area */}
         <main

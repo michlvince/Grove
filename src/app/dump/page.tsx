@@ -39,16 +39,16 @@ export default function TheDump() {
   const dumpedCreations = creations.filter((c) => c.worldId === "dump");
   const targetWorlds = DEFAULT_WORLDS.filter((w) => w.id !== "dump");
 
-  const handleManualReviveItem = (id: string, initialContent: string) => {
+  const handleManualReviveItem = async (id: string, initialContent: string) => {
     if (!reviveTitle.trim()) return;
-    const newCreation = reviveDumpItem(id, reviveTitle.trim(), targetWorldId);
+    const newCreation = await reviveDumpItem(id, reviveTitle.trim(), targetWorldId);
     setRevivingItemId(null);
     setReviveTitle("");
-    router.push(`/creation/${newCreation.id}`);
+    if (newCreation) router.push(`/creation/${newCreation.id}`);
   };
 
-  const handleManualReviveCreation = (id: string) => {
-    reviveDumpCreation(id, targetWorldId);
+  const handleManualReviveCreation = async (id: string) => {
+    await reviveDumpCreation(id, targetWorldId);
     setRevivingCreationId(null);
     router.push(`/creation/${id}`);
   };
