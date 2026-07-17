@@ -125,19 +125,18 @@ alter table public.push_subscriptions enable row level security;
 -- =============================================================================
 -- SEED ADMIN ACCOUNT
 -- -----------------------------------------------------------------------------
--- Replace the email and the password hash below, then run this block.
---
--- To generate the bcrypt hash for your chosen password, run in the project root:
---     node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" "YourStrongPassword"
---
--- Paste the printed hash into password_hash below.
+-- Owner admin account. Sign in at /signin with this email + password below.
+-- The password hash was generated with bcryptjs (cost 10) for "GroveAdmin2024!".
+-- To rotate it, run in the project root:
+--     node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" "NewPassword"
+-- and paste the new hash into password_hash below.
 -- =============================================================================
 insert into public.users (email, name, title, password_hash, role, provider)
 values (
-  'admin@grove.app',                 -- <-- change to your admin email
-  'Grove Admin',
+  'abesinmikel@gmail.com',
+  'Mikel Abesin',
   'Administrator',
-  '$2a$10$REPLACE_WITH_GENERATED_BCRYPT_HASH',   -- <-- paste bcrypt hash here
+  '$2b$10$t0klKOQQFKe48YD.CIlOxuhQsGjZBAOnPAik5WZCPaAuo1lurAkJ2',
   'admin',
   'credentials'
 )

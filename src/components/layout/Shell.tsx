@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Home as HomeIcon, Globe, Trash2, Sparkles, User, Sun, Moon, Bell, Shield, HelpCircle, LogOut } from "lucide-react";
+import { Home as HomeIcon, Globe, Trash2, Sparkles, User, Sun, Moon, Bell, HelpCircle, LogOut } from "lucide-react";
 import { useAppState } from "@/context/StateContext";
 import { useNotifications } from "@/context/NotificationContext";
 import TutorialModal from "../features/TutorialModal";
@@ -171,24 +171,6 @@ Preparing your Grove...
             <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-500">{theme}</span>
           </button>
 
-          {/* Admin dashboard (admins only) */}
-          {user.role === "admin" && (
-            <Link
-              href="/admin"
-              className={`w-full py-2 px-3.5 rounded-xl border flex items-center justify-between transition-premium text-xs ${
-                isActive("/admin")
-                  ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
-                  : "bg-background border-border text-muted hover:text-foreground"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                <span>Admin</span>
-              </span>
-              <span className="text-[10px] bg-surface-hover text-emerald-500 px-1.5 py-0.5 rounded uppercase font-bold">Analytics</span>
-            </Link>
-          )}
-
           {/* Help / Tutorial */}
           <button
             onClick={() => setShowTutorial(true)}
@@ -329,20 +311,6 @@ Preparing your Grove...
             >
               <HelpCircle className="w-4 h-4" />
             </button>
-
-            {user.role === "admin" && (
-              <Link
-                href="/admin"
-                className={`p-2 rounded-full border transition-premium ${
-                  isActive("/admin")
-                    ? "bg-emerald-950/40 border-[#7FE08A]/40 text-emerald-400"
-                    : "bg-surface border-border text-muted hover:text-foreground"
-                }`}
-                title="Admin"
-              >
-                <Shield className="w-4 h-4" />
-              </Link>
-            )}
 
             <button
               onClick={() => signOut({ callbackUrl: "/signin" })}
