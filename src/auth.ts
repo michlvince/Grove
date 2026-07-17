@@ -22,12 +22,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
 
-        const supabase = createAdminClient();
-        const { data: user } = await supabase
+        let supabase;
+        try {
+          supabase = createAdminClient();
+        } catch (err) {
+          // Missing Supabase env (SUPABASE_SERVICE_ROLE_KEY) — surface clearly.
+          console.error("[auth] authorize: Supabase client unavailable:", err);
+          throw new Error("Authentication service is not configured.");
+        }
+
+        const { data: user, error } = await supabase
           .from("users")
           .select("id, email, name, title, role, password_hash, image")
           .eq("email", email)
-          .single();
+          .maybeSingle();
+
+        if (error) {
+          // Database/connection failure (e.g. unreachable Supabase) — don't
+          // pretend it's a wrong password.
+          console.error("[auth] authorize: Supabase query failed:", error);
+          throw new Error("Could not verify credentials. Try again later.");
+        }
 
         if (!user || !user.password_hash) return null;
 

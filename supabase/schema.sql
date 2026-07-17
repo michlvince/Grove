@@ -47,6 +47,9 @@ create index if not exists creations_world_idx on public.creations (world_id);
 
 -- =============================================================================
 -- ENTRIES  (text / image / link / audio content of a creation)
+-- `content` holds: free text, a URL (link), an image URL, or a Cloudinary
+-- audio URL. Media (images/audio) is uploaded to Cloudinary and only the
+-- hosted URL is stored here -- never raw base64 blobs.
 -- =============================================================================
 create table if not exists public.entries (
   id          uuid primary key default gen_random_uuid(),

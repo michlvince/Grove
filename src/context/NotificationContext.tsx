@@ -64,6 +64,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         .register("/sw.js")
         .then((reg) => {
           setSwRegistration(reg);
+          // If the user already granted permission previously, subscribe to Web
+          // Push right away so admin/remote notifications work even if local
+          // reminders are off.
+          if (Notification.permission === "granted") {
+            subscribeToPush(reg);
+          }
           console.log("Service Worker registered successfully:", reg);
         })
         .catch((err) => {

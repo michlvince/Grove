@@ -378,19 +378,41 @@ export default function CreationDetail({ params }: PageProps) {
     }
   }, []);
 
-  // Stop recording — finalise audio blob and store as base64 data URL
+  // Upload a base64 data URL (image/audio) to Cloudinary via our API route,
+  // returning the hosted URL. Falls back to the raw data URL if the upload fails
+  // so the entry is still captured locally.
+  const uploadMedia = useCallback(
+    async (dataUrl: string, resourceType: "image" | "video"): Promise<string> => {
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: dataUrl, resourceType }),
+        });
+        if (!res.ok) return dataUrl;
+        const json = await res.json();
+        return json.url || dataUrl;
+      } catch {
+        return dataUrl;
+      }
+    },
+    []
+  );
+
+  // Stop recording — finalise audio blob and store via Cloudinary
   const handleStopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
 
     if (recorder && recorder.state !== "inactive") {
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, {
           type: recorder.mimeType || "audio/webm",
         });
         const reader = new FileReader();
-        reader.onloadend = () => {
+        reader.onloadend = async () => {
           const dataUrl = reader.result as string;
-          addEntry(creationId, "audio", dataUrl);
+          const url = await uploadMedia(dataUrl, "video");
+          addEntry(creationId, "audio", url);
         };
         reader.readAsDataURL(blob);
 
@@ -408,17 +430,18 @@ export default function CreationDetail({ params }: PageProps) {
 
     setIsRecording(false);
     setShowAttachDrawer(false);
-  }, [addEntry, creationId, recordSeconds]);
+  }, [addEntry, creationId, recordSeconds, uploadMedia]);
 
-  // Image from camera roll
+  // Image from camera roll — upload to Cloudinary, then store the hosted URL
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64String = reader.result as string;
-      addEntry(creationId, "image", base64String);
+      const url = await uploadMedia(base64String, "image");
+      addEntry(creationId, "image", url);
       setShowAttachDrawer(false);
     };
     reader.readAsDataURL(file);
