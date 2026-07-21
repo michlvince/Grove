@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 
 /**
  * Edge-safe auth config. Contains everything that must run in the middleware
@@ -14,7 +15,7 @@ export const authConfig = {
     signIn: "/signin",
   },
   session: { strategy: "jwt" },
-  providers: [],
+  providers: [GoogleProvider({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET }),],
   callbacks: {
     // Route protection, evaluated in middleware.
     authorized({ auth, request: { nextUrl } }) {
