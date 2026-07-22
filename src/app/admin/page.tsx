@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Shield,
   RefreshCw,
+  Mail,
+  Bell,
 } from "lucide-react";
 import type { AdminAnalytics } from "@/lib/analytics";
 
@@ -49,12 +51,15 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Push composer state
+  // Broadcast mode state: "push" | "email"
+  const [mode, setMode] = useState<"push" | "email">("push");
+
+  // Broadcast form state
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [target, setTarget] = useState("all");
   const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState<string | null>(null);
+  const [sendResult, setSendResult] = useState<{ text: string; error?: boolean } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -71,23 +76,36 @@ export default function AdminDashboard() {
     load();
   }, []);
 
-  const sendPush = async (e: React.FormEvent) => {
+  const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
     setSendResult(null);
-    const res = await fetch("/api/admin/push", {
+
+    const endpoint = mode === "push" ? "/api/admin/push" : "/api/admin/email";
+    const payload =
+      mode === "push"
+        ? { title, body: message, target }
+        : { target, subject: title, message };
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, body: message, target }),
+      body: JSON.stringify(payload),
     });
+
     const json = await res.json().catch(() => ({}));
     setSending(false);
+
     if (res.ok) {
-      setSendResult(`Sent to ${json.sent} device(s). ${json.failed ? json.failed + " failed." : ""}`);
+      const successMsg =
+        mode === "push"
+          ? `Push sent to ${json.sent} device(s). ${json.failed ? json.failed + " failed." : ""}`
+          : `No-reply email sent to ${json.sentCount} recipient(s).`;
+      setSendResult({ text: successMsg, error: false });
       setTitle("");
       setMessage("");
     } else {
-      setSendResult(json.error || "Failed to send.");
+      setSendResult({ text: json.error || "Failed to send.", error: true });
     }
   };
 
@@ -264,12 +282,41 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* Push composer */}
+      {/* Broadcast Composer (Push Notification or Email) */}
       <section className="space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Send push notification</h3>
-        <form onSubmit={sendPush} className="p-5 rounded-2xl border border-border bg-surface space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted">Broadcast Center</h3>
+          <div className="flex bg-background border border-border rounded-xl p-1 gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setMode("push")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+                mode === "push"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              Push Notification
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("email")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all ${
+                mode === "email"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5" />
+              No-Reply Email
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleBroadcast} className="p-5 rounded-2xl border border-border bg-surface space-y-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Target</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Recipient Target</label>
             <select
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -285,32 +332,42 @@ export default function AdminDashboard() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Title</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              {mode === "email" ? "Email Subject" : "Notification Title"}
+            </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. New feature available!"
+              placeholder={mode === "email" ? "e.g. Important Update from Grove" : "e.g. New feature available!"}
               className="w-full bg-background border border-border rounded-xl p-2.5 text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-emerald-500/50"
               required
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Message</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              {mode === "email" ? "Email Message (HTML / Markdown supported)" : "Notification Message"}
+            </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Write your announcement..."
-              rows={3}
-              className="w-full bg-background border border-border rounded-xl p-2.5 text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-emerald-500/50 resize-none"
+              placeholder={mode === "email" ? "Write your email message..." : "Write your announcement..."}
+              rows={4}
+              className="w-full bg-background border border-border rounded-xl p-2.5 text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-emerald-500/50 resize-none font-sans"
               required
             />
           </div>
 
           {sendResult && (
-            <div className="text-xs text-emerald-400 bg-emerald-950/20 border border-emerald-900/30 p-2.5 rounded-lg">
-              {sendResult}
+            <div
+              className={`text-xs p-2.5 rounded-lg border ${
+                sendResult.error
+                  ? "text-red-400 bg-red-950/20 border-red-900/30"
+                  : "text-emerald-400 bg-emerald-950/20 border-emerald-900/30"
+              }`}
+            >
+              {sendResult.text}
             </div>
           )}
 
@@ -319,8 +376,8 @@ export default function AdminDashboard() {
             disabled={sending}
             className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-premium text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            <Send className="w-4 h-4" />
-            {sending ? "Sending..." : "Send notification"}
+            {mode === "email" ? <Mail className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            {sending ? "Sending..." : mode === "email" ? "Send No-Reply Email" : "Send Push Notification"}
           </button>
         </form>
       </section>
