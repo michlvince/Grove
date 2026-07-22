@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Home as HomeIcon, Globe, Trash2, Sparkles, User, Sun, Moon, Bell, HelpCircle, LogOut } from "lucide-react";
+import { Home as HomeIcon, Globe, Trash2, Sparkles, User, Sun, Moon, Bell, HelpCircle, LogOut, Shield } from "lucide-react";
+
 import { useAppState } from "@/context/StateContext";
 import { useNotifications } from "@/context/NotificationContext";
 import TutorialModal from "../features/TutorialModal";
@@ -150,7 +151,23 @@ Preparing your Grove...
               <span className="absolute left-0 top-1/3 bottom-1/3 w-1 bg-emerald-400 rounded-full"></span>
             )}
           </Link>
+
+          {user?.role === "admin" && (
+            <Link
+              href="/admin"
+              className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-premium group relative ${
+                isActive("/admin") ? "bg-emerald-950/40 text-emerald-400 border border-emerald-500/30" : "text-emerald-500/80 hover:text-emerald-400"
+              }`}
+            >
+              <Shield className="w-4 h-4 transition-transform group-hover:scale-110 text-emerald-400" />
+              <span className="text-xs font-semibold tracking-wide">Admin Portal</span>
+              {isActive("/admin") && (
+                <span className="absolute left-0 top-1/3 bottom-1/3 w-1 bg-emerald-400 rounded-full"></span>
+              )}
+            </Link>
+          )}
         </nav>
+
 
         {/* Sidebar Footer Details */}
         <div className="space-y-3 pt-4 border-t border-border">
