@@ -2,7 +2,28 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase-admin";
 
 /**
- * Send an email from no-reply@grove.app (or custom domain) via Resend.
+ * Clean and format the `from` email address to guarantee valid Resend RFC 5322 format.
+ * Defaults to Resend's onboarding testing sender `onboarding@resend.dev`.
+ */
+function getSanitizedFromEmail(): string {
+  const raw = process.env.EMAIL_FROM;
+  if (!raw) {
+    return "onboarding@resend.dev";
+  }
+
+  // Strip surrounding quotes if present (e.g., "Grove <onboarding@resend.dev>")
+  const unquoted = raw.trim().replace(/^["']|["']$/g, "");
+
+  // Verify format matches valid email or "Name <email@domain.com>"
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(unquoted) || /^[^<>]+<[^\s@]+@[^\s@]+\.[^\s@]+>$/.test(unquoted)) {
+    return unquoted;
+  }
+
+  return "onboarding@resend.dev";
+}
+
+/**
+ * Send an email via Resend.
  */
 export async function sendNoReplyEmail({
   to,
@@ -16,10 +37,10 @@ export async function sendNoReplyEmail({
   text?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "Grove <no-reply@resend.dev>";
+  const fromEmail = getSanitizedFromEmail();
 
   if (!apiKey) {
-    throw new Error("Missing RESEND_API_KEY environment variable.");
+    throw new Error("Missing RESEND_API_KEY environment variable. Please set it in Vercel / .env.local.");
   }
 
   const resend = new Resend(apiKey);
