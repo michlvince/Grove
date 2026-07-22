@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@fontsource/instrument-sans": "^5.2.8",
-    "@supabase/supabase-js": "^2.110.1",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.8",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "lucide-react": "^1.21.0",
