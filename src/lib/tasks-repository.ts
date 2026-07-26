@@ -7,12 +7,18 @@ interface TaskRow {
   title: string;
   priority: TaskPriority;
   status: TaskStatus;
+  assignee_id?: string | null;
   start_date: string | null;
   due_date: string | null;
   sort_order: number;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
 }
 
 function mapTask(row: TaskRow): Task {
@@ -22,6 +28,10 @@ function mapTask(row: TaskRow): Task {
     title: row.title,
     priority: row.priority,
     status: row.status,
+    assigneeId: row.assignee_id ?? null,
+    assignee: row.assignee
+      ? { id: row.assignee.id, name: row.assignee.name, email: row.assignee.email }
+      : null,
     startDate: row.start_date,
     dueDate: row.due_date,
     sortOrder: row.sort_order,
@@ -31,26 +41,15 @@ function mapTask(row: TaskRow): Task {
   };
 }
 
-// Verify the creation belongs to the user before touching tasks.
-async function assertOwnsCreation(userId: string, creationId: string) {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("creations")
-    .select("id")
-    .eq("id", creationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  return !!data;
-}
-
 export async function getTasks(userId: string, creationId: string): Promise<Task[]> {
-  if (!(await assertOwnsCreation(userId, creationId))) return [];
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("tasks")
-    .select("*")
+    .select(`
+      *,
+      assignee:users!tasks_assignee_id_fkey(id, name, email)
+    `)
     .eq("creation_id", creationId)
-    .eq("user_id", userId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
   return ((data ?? []) as TaskRow[]).map(mapTask);
@@ -62,11 +61,11 @@ export async function createTask(
   input: {
     title: string;
     priority?: TaskPriority;
+    assigneeId?: string | null;
     startDate?: string | null;
     dueDate?: string | null;
   }
 ): Promise<Task | null> {
-  if (!(await assertOwnsCreation(userId, creationId))) return null;
   const supabase = createAdminClient();
 
   const { data: maxRow } = await supabase
@@ -83,13 +82,17 @@ export async function createTask(
     .insert({
       creation_id: creationId,
       user_id: userId,
+      assignee_id: input.assigneeId ?? null,
       title: input.title,
       priority: input.priority ?? "medium",
       start_date: input.startDate ?? null,
       due_date: input.dueDate ?? null,
       sort_order: nextOrder,
     })
-    .select("*")
+    .select(`
+      *,
+      assignee:users!tasks_assignee_id_fkey(id, name, email)
+    `)
     .single();
 
   return data ? mapTask(data as TaskRow) : null;
@@ -102,6 +105,7 @@ export async function updateTask(
     title: string;
     priority: TaskPriority;
     status: TaskStatus;
+    assigneeId: string | null;
     startDate: string | null;
     dueDate: string | null;
     sortOrder: number;
@@ -112,6 +116,7 @@ export async function updateTask(
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined) update.title = patch.title;
   if (patch.priority !== undefined) update.priority = patch.priority;
+  if (patch.assigneeId !== undefined) update.assignee_id = patch.assigneeId;
   if (patch.startDate !== undefined) update.start_date = patch.startDate;
   if (patch.dueDate !== undefined) update.due_date = patch.dueDate;
   if (patch.sortOrder !== undefined) update.sort_order = patch.sortOrder;
@@ -124,8 +129,10 @@ export async function updateTask(
     .from("tasks")
     .update(update)
     .eq("id", taskId)
-    .eq("user_id", userId)
-    .select("*")
+    .select(`
+      *,
+      assignee:users!tasks_assignee_id_fkey(id, name, email)
+    `)
     .single();
 
   return data ? mapTask(data as TaskRow) : null;
@@ -133,5 +140,5 @@ export async function updateTask(
 
 export async function deleteTask(userId: string, taskId: string): Promise<void> {
   const supabase = createAdminClient();
-  await supabase.from("tasks").delete().eq("id", taskId).eq("user_id", userId);
+  await supabase.from("tasks").delete().eq("id", taskId);
 }

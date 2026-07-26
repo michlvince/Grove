@@ -10,6 +10,7 @@ import {
   Flag,
   CalendarDays,
   ListChecks,
+  UserCheck,
 } from "lucide-react";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain";
 
@@ -27,22 +28,41 @@ function nextStatus(s: TaskStatus): TaskStatus {
   return STATUS_ORDER[(i + 1) % STATUS_ORDER.length];
 }
 
+interface CommunityUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export default function ProductionTab({ creationId }: { creationId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [collaborators, setCollaborators] = useState<CommunityUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   // New task form
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [assigneeId, setAssigneeId] = useState<string>("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/tasks?creationId=${encodeURIComponent(creationId)}`, {
-      cache: "no-store",
-    });
-    if (res.ok) setTasks((await res.json()).tasks ?? []);
+    const [tRes, mRes] = await Promise.all([
+      fetch(`/api/tasks?creationId=${encodeURIComponent(creationId)}`, { cache: "no-store" }),
+      fetch(`/api/creations/${encodeURIComponent(creationId)}/members`, { cache: "no-store" }),
+    ]);
+
+    if (tRes.ok) setTasks((await tRes.json()).tasks ?? []);
+    if (mRes.ok) {
+      const data = await mRes.json();
+      const usersList = (data.members ?? []).map((m: any) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+      }));
+      setCollaborators(usersList);
+    }
     setLoading(false);
   }, [creationId]);
 
@@ -61,6 +81,7 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
         creationId,
         title: title.trim(),
         priority,
+        assigneeId: assigneeId || null,
         startDate: startDate || null,
         dueDate: dueDate || null,
       }),
@@ -71,6 +92,7 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
       setTasks((prev) => [...prev, task]);
       setTitle("");
       setPriority("medium");
+      setAssigneeId("");
       setStartDate("");
       setDueDate("");
     }
@@ -93,13 +115,6 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
   const progress = total ? Math.round((done / total) * 100) : 0;
-
-  // Timeline bounds
-  const dated = tasks.filter((t) => t.startDate || t.dueDate);
-  const allDates = dated.flatMap((t) => [t.startDate, t.dueDate].filter(Boolean) as string[]);
-  const minDate = allDates.length ? new Date(allDates.reduce((a, b) => (a < b ? a : b))) : null;
-  const maxDate = allDates.length ? new Date(allDates.reduce((a, b) => (a > b ? a : b))) : null;
-  const spanMs = minDate && maxDate ? Math.max(1, maxDate.getTime() - minDate.getTime()) : 1;
 
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
@@ -124,7 +139,7 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
         </div>
       </div>
 
-      {/* Add task */}
+      {/* Add task form */}
       <form onSubmit={addTask} className="p-4 rounded-2xl border border-border bg-surface/50 space-y-3">
         <input
           type="text"
@@ -133,13 +148,13 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
           placeholder="Add a task for this project..."
           className="w-full bg-background border border-border rounded-xl py-2.5 px-3 text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-emerald-500/50"
         />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="space-y-1">
             <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Priority</label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as TaskPriority)}
-              className="w-full bg-background border border-border rounded-lg p-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
+              className="w-full bg-background border border-border rounded-xl py-1.5 px-2.5 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -147,102 +162,116 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
               <option value="urgent">Urgent</option>
             </select>
           </div>
+
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Start</label>
+            <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Assignee</label>
+            <select
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl py-1.5 px-2.5 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
+            >
+              <option value="">Unassigned</option>
+              {collaborators.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Start date</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg p-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
+              className="w-full bg-background border border-border rounded-xl py-1.5 px-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
             />
           </div>
+
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Due</label>
+            <label className="text-[9px] uppercase font-bold text-muted tracking-wider">Due date</label>
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg p-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
+              className="w-full bg-background border border-border rounded-xl py-1.5 px-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
             />
           </div>
         </div>
+
         <button
           type="submit"
-          disabled={!title.trim() || adding}
-          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-premium text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none"
+          disabled={adding || !title.trim()}
+          className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50"
         >
-          <Plus className="w-3.5 h-3.5" /> Add task
+          <Plus className="w-4 h-4" /> Add Task
         </button>
       </form>
 
       {/* Task list */}
       <div className="space-y-2">
-        <h4 className="text-[10px] uppercase font-bold text-muted tracking-wider px-1">To-do list</h4>
         {loading ? (
-          <p className="text-xs text-muted text-center py-6">Loading tasks...</p>
+          <div className="text-center py-6 text-xs text-muted">Loading production tasks...</div>
         ) : tasks.length === 0 ? (
-          <p className="text-xs text-muted text-center py-6">No tasks yet. Add your first one above.</p>
+          <div className="p-6 text-center text-xs text-muted rounded-2xl border border-dashed border-border">
+            No tasks created yet for this project.
+          </div>
         ) : (
-          tasks.map((t) => {
-            const meta = PRIORITY_META[t.priority];
+          tasks.map((task) => {
+            const meta = PRIORITY_META[task.priority];
             return (
               <div
-                key={t.id}
-                className={`p-3 rounded-xl border bg-surface/50 flex items-start gap-3 group ${
-                  t.status === "done" ? "border-border/50 opacity-70" : "border-border"
-                }`}
+                key={task.id}
+                className="p-3.5 rounded-2xl border border-border bg-surface flex items-center justify-between gap-3 text-xs"
               >
-                <button
-                  onClick={() => patchTask(t.id, { status: nextStatus(t.status) })}
-                  className="mt-0.5 shrink-0"
-                  title="Change status"
-                >
-                  {t.status === "done" ? (
-                    <Check className="w-4 h-4 text-emerald-500" />
-                  ) : t.status === "in_progress" ? (
-                    <CircleDot className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-muted" />
-                  )}
-                </button>
-
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <p
-                    className={`text-xs font-medium break-words ${
-                      t.status === "done" ? "line-through text-muted" : "text-foreground"
-                    }`}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <button
+                    onClick={() => patchTask(task.id, { status: nextStatus(task.status) })}
+                    className="shrink-0 text-muted hover:text-emerald-400 transition-colors"
                   >
-                    {t.title}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <select
-                      value={t.priority}
-                      onChange={(e) => patchTask(t.id, { priority: e.target.value as TaskPriority })}
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-transparent focus:outline-none cursor-pointer ${meta.className}`}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                    {(t.startDate || t.dueDate) && (
-                      <span className="text-[9px] text-muted flex items-center gap-1 border border-border rounded-full px-1.5 py-0.5">
-                        <CalendarDays className="w-2.5 h-2.5" />
-                        {fmt(t.startDate)}
-                        {t.startDate && t.dueDate ? " → " : ""}
-                        {fmt(t.dueDate)}
-                      </span>
+                    {task.status === "done" ? (
+                      <Check className="w-4 h-4 text-emerald-400" />
+                    ) : task.status === "in_progress" ? (
+                      <CircleDot className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Circle className="w-4 h-4" />
                     )}
-                    <span className="text-[9px] uppercase tracking-wide text-muted">
-                      {t.status === "in_progress" ? "In progress" : t.status}
-                    </span>
+                  </button>
+
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div
+                      className={`font-medium truncate ${
+                        task.status === "done" ? "line-through text-muted" : "text-foreground"
+                      }`}
+                    >
+                      {task.title}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted">
+                      <span className={`px-1.5 py-0.5 rounded border font-semibold ${meta.className}`}>
+                        {meta.label}
+                      </span>
+
+                      {task.assignee && (
+                        <span className="flex items-center gap-1 text-emerald-400 font-semibold bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                          <UserCheck className="w-3 h-3" /> {task.assignee.name}
+                        </span>
+                      )}
+
+                      {(task.startDate || task.dueDate) && (
+                        <span className="flex items-center gap-1">
+                          <CalendarDays className="w-3 h-3 text-muted" />
+                          {fmt(task.startDate)} {task.dueDate ? `→ ${fmt(task.dueDate)}` : ""}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => removeTask(t.id)}
-                  className="text-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                  title="Delete task"
+                  onClick={() => removeTask(task.id)}
+                  className="p-1.5 text-muted hover:text-red-400 transition-colors shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -251,42 +280,6 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
           })
         )}
       </div>
-
-      {/* Timeline */}
-      {dated.length > 0 && minDate && maxDate && (
-        <div className="space-y-2">
-          <h4 className="text-[10px] uppercase font-bold text-muted tracking-wider px-1 flex items-center gap-1.5">
-            <Flag className="w-3 h-3" /> Production timeline
-          </h4>
-          <div className="p-4 rounded-2xl border border-border bg-surface/50 space-y-3">
-            <div className="flex justify-between text-[9px] text-muted">
-              <span>{fmt(minDate.toISOString())}</span>
-              <span>{fmt(maxDate.toISOString())}</span>
-            </div>
-            {dated.map((t) => {
-              const start = t.startDate ? new Date(t.startDate) : new Date(t.dueDate!);
-              const end = t.dueDate ? new Date(t.dueDate) : new Date(t.startDate!);
-              const left = ((start.getTime() - minDate.getTime()) / spanMs) * 100;
-              const width = Math.max(4, ((end.getTime() - start.getTime()) / spanMs) * 100);
-              const meta = PRIORITY_META[t.priority];
-              return (
-                <div key={t.id} className="space-y-1">
-                  <span className="text-[10px] text-foreground truncate block">{t.title}</span>
-                  <div className="relative h-2.5 rounded-full bg-background">
-                    <div
-                      className={`absolute h-full rounded-full ${meta.dot} ${
-                        t.status === "done" ? "opacity-50" : ""
-                      }`}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                      title={`${fmt(t.startDate)} → ${fmt(t.dueDate)}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -21,6 +21,8 @@ export interface Creation {
   worldId: string;
   originalWorldId?: string;
   status: CreationStatus;
+  mode?: "personal" | "team";
+  isPublic?: boolean;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
   entries: Entry[];
@@ -41,6 +43,12 @@ export interface Task {
   title: string;
   priority: TaskPriority;
   status: TaskStatus;
+  assigneeId?: string | null;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
   startDate: string | null; // YYYY-MM-DD
   dueDate: string | null; // YYYY-MM-DD
   sortOrder: number;
@@ -48,3 +56,4 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
 }
+

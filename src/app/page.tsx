@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useEffect, useState } from "react";
 import CaptureCard from "@/components/features/CaptureCard";
 import { useAppState, Creation, DEFAULT_WORLDS } from "@/context/StateContext";
@@ -52,6 +53,8 @@ export default function Home() {
   } else if (dumpItems.length > 0) {
     revivalTarget = { type: "dump", item: dumpItems[dumpItems.length - 1] };
   }
+
+
 
   const getRelativeTime = (isoString: string) => {
     try {
@@ -137,7 +140,7 @@ export default function Home() {
 
             {/* Grove Core - Orb Button */}
             <div className="flex justify-center py-6">
-              <button 
+              <button
                 className="group relative w-40 h-40 rounded-full animate-orbBreathe transition-transform hover:scale-105 active:scale-95"
                 onClick={() => {
                   router.push("/worlds");
@@ -145,7 +148,7 @@ export default function Home() {
               >
                 {/* Outer Glow */}
                 <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-3xl animate-pulse" />
-                
+
                 {/* Secondary Glow */}
                 <div className="absolute inset-2 rounded-full bg-emerald-400/10 blur-2xl animate-pulse delay-700" />
 
@@ -200,7 +203,7 @@ export default function Home() {
               {revivalTarget ? (
                 <div className="relative group">
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-emerald-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  
+
                   <div className="relative p-5 bg-gradient-to-br from-surface to-background backdrop-blur-xl rounded-2xl border border-emerald-500/10 hover:border-emerald-500/20 transition-all duration-300">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -277,8 +280,8 @@ export default function Home() {
                   </h3>
                 </div>
                 {activeCreations.length > 3 && (
-                  <Link 
-                    href="/worlds" 
+                  <Link
+                    href="/worlds"
                     className="text-xs text-muted hover:text-emerald-400 transition-colors duration-300 font-medium"
                   >
                     View all →

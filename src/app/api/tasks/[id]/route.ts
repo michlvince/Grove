@@ -18,6 +18,7 @@ export async function PATCH(
     title: body?.title,
     priority: body?.priority as TaskPriority | undefined,
     status: body?.status as TaskStatus | undefined,
+    assigneeId: body?.assigneeId,
     startDate: body?.startDate,
     dueDate: body?.dueDate,
     sortOrder: body?.sortOrder,

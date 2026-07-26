@@ -32,6 +32,7 @@ export async function POST(req: Request) {
   const task = await createTask(session.user.id, creationId, {
     title,
     priority: body?.priority as TaskPriority | undefined,
+    assigneeId: body?.assigneeId ?? null,
     startDate: body?.startDate ?? null,
     dueDate: body?.dueDate ?? null,
   });

@@ -19,6 +19,9 @@ import {
   Upload,
   ZoomIn,
   Square,
+  Users,
+  UserPlus,
+  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -297,9 +300,106 @@ export default function CreationDetail({ params }: PageProps) {
 
   const { creations, updateCreationStatus, addEntry, deleteCreation } = useAppState();
 
-  const [mounted, setMounted] = useState(false);
-  const [inputText, setInputText] = useState("");
-  const [activeTab, setActiveTab] = useState<"timeline" | "production">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "production" | "chat">("timeline");
+  const [creationMode, setCreationMode] = useState<"personal" | "team">("personal");
+  const [members, setMembers] = useState<any[]>([]);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+
+  // Project chat state
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [newChatMessage, setNewChatMessage] = useState("");
+  const [loadingChat, setLoadingChat] = useState(false);
+  const [sendingChat, setSendingChat] = useState(false);
+
+  const loadMembers = useCallback(async () => {
+    const res = await fetch(`/api/creations/${creationId}/members`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      setMembers(data.members ?? []);
+    }
+  }, [creationId]);
+
+  const loadAvailableUsers = async () => {
+    const res = await fetch("/api/users", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      setAvailableUsers(data.users ?? []);
+    }
+  };
+
+  const loadProjectChat = useCallback(async () => {
+    setLoadingChat(true);
+    const res = await fetch(`/api/creations/${creationId}/chat`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      setChatMessages(data.messages ?? []);
+    }
+    setLoadingChat(false);
+  }, [creationId]);
+
+  useEffect(() => {
+    if (creation) {
+      setCreationMode(creation.mode ?? "personal");
+      loadMembers();
+    }
+  }, [creation, loadMembers]);
+
+  useEffect(() => {
+    if (activeTab === "chat") {
+      loadProjectChat();
+    }
+  }, [activeTab, loadProjectChat]);
+
+  const toggleMode = async () => {
+    const newMode = creationMode === "personal" ? "team" : "personal";
+    setCreationMode(newMode);
+    await fetch(`/api/creations/${creationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateMode", mode: newMode }),
+    });
+  };
+
+  const addCollaborator = async (userId: string) => {
+    const res = await fetch(`/api/creations/${creationId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role: "member" }),
+    });
+    if (res.ok) {
+      loadMembers();
+    }
+  };
+
+  const removeCollaborator = async (userId: string) => {
+    const res = await fetch(`/api/creations/${creationId}/members?userId=${userId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      loadMembers();
+    }
+  };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newChatMessage.trim()) return;
+
+    setSendingChat(true);
+    const res = await fetch(`/api/creations/${creationId}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: newChatMessage.trim() }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      setChatMessages((prev) => [...prev, data.message]);
+      setNewChatMessage("");
+    }
+    setSendingChat(false);
+  };
+
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showAttachDrawer, setShowAttachDrawer] = useState(false);
@@ -553,6 +653,34 @@ export default function CreationDetail({ params }: PageProps) {
           </div>
 
           <div className="flex items-center gap-2 relative">
+            {/* Mode Badge (Personal / Team) */}
+            <button
+              onClick={toggleMode}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border flex items-center gap-1 transition-all ${
+                creationMode === "team"
+                  ? "bg-violet-950/50 border-violet-500/40 text-violet-300"
+                  : "bg-surface border-border text-muted"
+              }`}
+              title="Click to toggle Personal / Team Mode"
+            >
+              <Users className="w-3 h-3" />
+              {creationMode === "team" ? "Team Mode" : "Personal"}
+            </button>
+
+            {/* Collaborators Button (for Team Mode) */}
+            {creationMode === "team" && (
+              <button
+                onClick={() => {
+                  loadAvailableUsers();
+                  setShowMembersModal(true);
+                }}
+                className="p-1.5 rounded-full border border-border bg-surface text-muted hover:text-emerald-400 transition-colors"
+                title="Manage Team Members"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             {/* Status Badge */}
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -602,7 +730,7 @@ export default function CreationDetail({ params }: PageProps) {
         </div>
 
         {/* ── Tab Switcher ───────────────────────────────────────── */}
-        <div className="flex bg-surface border border-border p-1 rounded-xl mt-1">
+        <div className="flex bg-surface border border-border p-1 rounded-xl mt-1 gap-1">
           <button
             onClick={() => setActiveTab("timeline")}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-premium ${
@@ -623,9 +751,67 @@ export default function CreationDetail({ params }: PageProps) {
           >
             Production
           </button>
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-premium flex items-center justify-center gap-1.5 ${
+              activeTab === "chat"
+                ? "bg-background text-emerald-400 border border-border"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            Project Chat
+          </button>
         </div>
 
         {activeTab === "production" && <ProductionTab creationId={creationId} />}
+
+        {/* ── Project Group Chat Tab ──────────────────────────────── */}
+        {activeTab === "chat" && (
+          <div className="flex-1 flex flex-col my-3 border border-border rounded-2xl bg-surface overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-background/30">
+              {loadingChat ? (
+                <div className="text-center py-8 text-xs text-muted">Loading project messages...</div>
+              ) : chatMessages.length === 0 ? (
+                <div className="text-center py-12 space-y-2">
+                  <MessageCircle className="w-6 h-6 text-emerald-400 mx-auto opacity-60" />
+                  <p className="text-xs text-muted">No group chat messages yet. Start collaborating!</p>
+                </div>
+              ) : (
+                chatMessages.map((msg) => (
+                  <div key={msg.id} className="p-3 rounded-xl bg-background border border-border/50 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-emerald-400">{msg.user?.name || "Collaborator"}</span>
+                      <span className="text-[9px] text-muted">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div className="text-foreground">{msg.message}</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <form onSubmit={handleSendChatMessage} className="p-2 border-t border-border bg-surface flex gap-2">
+              <input
+                type="text"
+                value={newChatMessage}
+                onChange={(e) => setNewChatMessage(e.target.value)}
+                placeholder="Discuss project tasks..."
+                className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-emerald-500/50"
+              />
+              <button
+                type="submit"
+                disabled={sendingChat || !newChatMessage.trim()}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Send
+              </button>
+            </form>
+          </div>
+        )}
+
 
         {/* ── Timeline Content ───────────────────────────────────── */}
         {activeTab === "timeline" && (
@@ -871,7 +1057,76 @@ export default function CreationDetail({ params }: PageProps) {
           </button>
         </form>
 
+        {/* ── Team Collaborators Manager Modal ───────────────────────── */}
+        {showMembersModal && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-surface border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-emerald-400" />
+                  <h3 className="font-bold text-foreground text-sm">Project Collaborators</h3>
+                </div>
+                <button onClick={() => setShowMembersModal(false)} className="text-muted hover:text-foreground text-xs p-1">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Current Collaborators */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-muted tracking-wider block">
+                  Assigned Team Members ({members.length})
+                </span>
+                {members.length === 0 ? (
+                  <p className="text-xs text-muted py-2">No team members assigned yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {members.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between p-2 rounded-xl bg-background border border-border text-xs">
+                        <div>
+                          <div className="font-semibold text-foreground">{m.user?.name}</div>
+                          <div className="text-[10px] text-muted">{m.user?.email}</div>
+                        </div>
+                        <button
+                          onClick={() => removeCollaborator(m.user_id)}
+                          className="text-red-400 hover:text-red-300 text-[10px] font-semibold px-2 py-1 rounded bg-red-950/20 border border-red-900/30"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add New Collaborator */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <span className="text-[10px] uppercase font-bold text-muted tracking-wider block">
+                  Add Member to Project
+                </span>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {availableUsers
+                    .filter((u) => !members.some((m) => m.user_id === u.id))
+                    .map((u) => (
+                      <div key={u.id} className="flex items-center justify-between p-2 rounded-xl bg-background border border-border/50 text-xs">
+                        <div>
+                          <div className="font-medium text-foreground">{u.name}</div>
+                          <div className="text-[10px] text-muted">{u.email}</div>
+                        </div>
+                        <button
+                          onClick={() => addCollaborator(u.id)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold rounded-lg flex items-center gap-1"
+                        >
+                          <UserPlus className="w-3 h-3" /> Assign
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
 }
+

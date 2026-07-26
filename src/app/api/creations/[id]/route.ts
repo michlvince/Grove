@@ -33,6 +33,14 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   }
 
+  if (body?.action === "updateMode") {
+    const mode = body.mode === "team" ? "team" : "personal";
+    const { createAdminClient } = await import("@/lib/supabase-admin");
+    const supabase = createAdminClient();
+    await supabase.from("creations").update({ mode }).eq("id", id);
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
 
