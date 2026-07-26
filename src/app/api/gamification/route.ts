@@ -109,15 +109,15 @@ export async function POST(req: Request) {
   // Simple level formula: every 100 XP = level up (level 1 at 0-99, level 2 at 100-199, etc.)
   const newLevel = Math.floor(newXP / 100) + 1;
 
-  // Update XP and level
-  const { data: updatedData, error: updErr } = await supabase
-    .from("user_xp")
-    .upsert(
-      { user_id: session.user.id, xp: newXP, level: newLevel, updated_at: new Date().toISOString() },
-      { onConflict: ["user_id"] }
-    )
-    .select()
-    .single();
+// Update XP and level
+   const { data: updatedData, error: updErr } = await supabase
+     .from("user_xp")
+     .upsert(
+       { user_id: session.user.id, xp: newXP, level: newLevel, updated_at: new Date().toISOString() },
+       { onConflict: "user_id" }
+     )
+     .select()
+     .single();
 
   if (updErr) {
     return NextResponse.json({ error: updErr.message }, { status: 500 });

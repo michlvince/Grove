@@ -305,6 +305,10 @@ export default function CreationDetail({ params }: PageProps) {
   const [members, setMembers] = useState<any[]>([]);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [inputText, setInputText] = useState("");
+
+  const creation = creations.find((c) => c.id === creationId);
 
   // Project chat state
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -552,8 +556,6 @@ export default function CreationDetail({ params }: PageProps) {
     const s = sec % 60;
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
-
-  const creation = creations.find((c) => c.id === creationId);
 
   useEffect(() => {
     if (creation?.entries) {
