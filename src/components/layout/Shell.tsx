@@ -169,7 +169,7 @@ Preparing your Grove...
         </nav>
 
 
-        {/* Sidebar Footer Details */}
+          {/* Sidebar Footer Details */}
         <div className="space-y-3 pt-4 border-t border-border">
           {/* Theme Toggle Trigger */}
           <button

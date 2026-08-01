@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { MessageSquare, Send, User, RefreshCw, Sparkles, Check, CheckCheck } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAppState } from "@/context/StateContext";
 import type { DirectMessage } from "@/types/collaboration";
 
 interface CommunityUser {
@@ -59,26 +61,36 @@ export default function DirectMessagesPage() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const { user } = useAppState();
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUser || !newMessage.trim()) return;
+    if (!selectedUser || !newMessage.trim() || !user) return;
 
     setSending(true);
-    const res = await fetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        receiverId: selectedUser.id,
-        message: newMessage.trim(),
-      }),
-    });
 
-    if (res.ok) {
-      const data = await res.json();
-      setMessages((prev) => [...prev, data.message]);
-      setNewMessage("");
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiverId: selectedUser.id,
+          content: newMessage.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.message) {
+          setMessages((prev) => [...prev, data.message]);
+        }
+        setNewMessage("");
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   return (

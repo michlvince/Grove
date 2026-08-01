@@ -7,18 +7,20 @@ import {
   Check,
   Circle,
   CircleDot,
-  Flag,
   CalendarDays,
   ListChecks,
   UserCheck,
+  Filter,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import type { Task, TaskPriority, TaskStatus } from "@/types/domain";
 
-const PRIORITY_META: Record<TaskPriority, { label: string; className: string; dot: string }> = {
-  low: { label: "Low", className: "text-slate-400 border-slate-500/30 bg-slate-500/10", dot: "bg-slate-400" },
-  medium: { label: "Medium", className: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10", dot: "bg-emerald-400" },
-  high: { label: "High", className: "text-amber-400 border-amber-500/30 bg-amber-500/10", dot: "bg-amber-400" },
-  urgent: { label: "Urgent", className: "text-red-400 border-red-500/30 bg-red-500/10", dot: "bg-red-400" },
+const PRIORITY_META: Record<TaskPriority, { label: string; className: string }> = {
+  low: { label: "Low", className: "text-slate-400 border-slate-500/30 bg-slate-500/10" },
+  medium: { label: "Medium", className: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" },
+  high: { label: "High", className: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
+  urgent: { label: "Urgent", className: "text-red-400 border-red-500/30 bg-red-500/10" },
 };
 
 const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "done"];
@@ -34,10 +36,13 @@ interface CommunityUser {
   email: string;
 }
 
+type FilterTab = "all" | "todo" | "in_progress" | "done";
+
 export default function ProductionTab({ creationId }: { creationId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [collaborators, setCollaborators] = useState<CommunityUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
 
   // New task form
   const [title, setTitle] = useState("");
@@ -113,39 +118,64 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
   };
 
   const total = tasks.length;
-  const done = tasks.filter((t) => t.status === "done").length;
-  const progress = total ? Math.round((done / total) * 100) : 0;
+  const todoCount = tasks.filter((t) => t.status === "todo").length;
+  const inProgressCount = tasks.filter((t) => t.status === "in_progress").length;
+  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const progress = total ? Math.round((doneCount / total) * 100) : 0;
+
+  const filteredTasks = tasks.filter((t) => {
+    if (activeFilter === "all") return true;
+    return t.status === activeFilter;
+  });
 
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
 
   return (
     <div className="flex-1 overflow-y-auto py-4 pr-1 space-y-5 no-scrollbar">
-      {/* Progress header */}
-      <div className="p-4 rounded-2xl border border-border bg-surface/50 space-y-2">
+      {/* Progress & Overview Card */}
+      <div className="p-4 rounded-2xl border border-border bg-surface/50 space-y-3">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <ListChecks className="w-4 h-4 text-emerald-500" /> Production progress
+            <ListChecks className="w-4 h-4 text-emerald-500" /> Production Progress & Tracking
           </span>
-          <span className="text-xs text-muted">
-            {done}/{total} done · {progress}%
+          <span className="text-xs font-bold text-emerald-400">
+            {doneCount}/{total} done ({progress}%)
           </span>
         </div>
-        <div className="h-2 rounded-full bg-background overflow-hidden">
+        <div className="h-2 rounded-full bg-background overflow-hidden flex">
           <div
-            className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+            className="h-full bg-emerald-500 transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
+          <div
+            className="h-full bg-amber-500/80 transition-all duration-500"
+            style={{ width: `${total ? Math.round((inProgressCount / total) * 100) : 0}%` }}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+          <div className="p-2 rounded-xl bg-background/50 border border-border/50">
+            <div className="text-[10px] text-muted uppercase font-bold">To Do</div>
+            <div className="text-sm font-bold text-foreground">{todoCount}</div>
+          </div>
+          <div className="p-2 rounded-xl bg-background/50 border border-border/50">
+            <div className="text-[10px] text-amber-400/90 uppercase font-bold">In Progress</div>
+            <div className="text-sm font-bold text-amber-400">{inProgressCount}</div>
+          </div>
+          <div className="p-2 rounded-xl bg-background/50 border border-border/50">
+            <div className="text-[10px] text-emerald-400/90 uppercase font-bold">Completed</div>
+            <div className="text-sm font-bold text-emerald-400">{doneCount}</div>
+          </div>
         </div>
       </div>
 
-      {/* Add task form */}
+      {/* Add Task Form */}
       <form onSubmit={addTask} className="p-4 rounded-2xl border border-border bg-surface/50 space-y-3">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Add a task for this project..."
+          placeholder="Add a new production task..."
           className="w-full bg-background border border-border rounded-xl py-2.5 px-3 text-sm text-foreground placeholder-muted/50 focus:outline-none focus:border-emerald-500/50"
         />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -209,33 +239,62 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
         </button>
       </form>
 
-      {/* Task list */}
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <span className="text-[10px] uppercase font-bold text-muted px-1 flex items-center gap-1">
+          <Filter className="w-3 h-3" /> Filter:
+        </span>
+        {(["all", "todo", "in_progress", "done"] as FilterTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveFilter(tab)}
+            className={`px-3 py-1 rounded-xl text-xs font-medium capitalize transition-all shrink-0 ${
+              activeFilter === tab
+                ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 shadow-sm"
+                : "text-muted hover:text-foreground bg-surface/40 border border-border/40"
+            }`}
+          >
+            {tab === "all" ? `All (${total})` : tab === "todo" ? `To Do (${todoCount})` : tab === "in_progress" ? `In Progress (${inProgressCount})` : `Done (${doneCount})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Task List */}
       <div className="space-y-2">
         {loading ? (
-          <div className="text-center py-6 text-xs text-muted">Loading production tasks...</div>
-        ) : tasks.length === 0 ? (
+          <div className="text-center py-6 text-xs text-muted">Loading tasks...</div>
+        ) : filteredTasks.length === 0 ? (
           <div className="p-6 text-center text-xs text-muted rounded-2xl border border-dashed border-border">
-            No tasks created yet for this project.
+            {activeFilter === "all"
+              ? "No tasks created yet for this project."
+              : `No tasks in status "${activeFilter.replace("_", " ")}".`}
           </div>
         ) : (
-          tasks.map((task) => {
+          filteredTasks.map((task) => {
             const meta = PRIORITY_META[task.priority];
             return (
               <div
                 key={task.id}
-                className="p-3.5 rounded-2xl border border-border bg-surface flex items-center justify-between gap-3 text-xs"
+                className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 text-xs ${
+                  task.status === "done"
+                    ? "bg-surface/30 border-border/60 opacity-80"
+                    : task.status === "in_progress"
+                    ? "bg-surface/80 border-amber-500/30"
+                    : "bg-surface border-border"
+                }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <button
                     onClick={() => patchTask(task.id, { status: nextStatus(task.status) })}
-                    className="shrink-0 text-muted hover:text-emerald-400 transition-colors"
+                    title={`Current: ${task.status.replace("_", " ")}. Click to advance status.`}
+                    className="shrink-0 text-muted hover:text-emerald-400 transition-colors p-1"
                   >
                     {task.status === "done" ? (
-                      <Check className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     ) : task.status === "in_progress" ? (
-                      <CircleDot className="w-4 h-4 text-amber-400" />
+                      <CircleDot className="w-5 h-5 text-amber-400" />
                     ) : (
-                      <Circle className="w-4 h-4" />
+                      <Circle className="w-5 h-5" />
                     )}
                   </button>
 
@@ -253,6 +312,18 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
                         {meta.label}
                       </span>
 
+                      <span
+                        className={`px-1.5 py-0.5 rounded font-semibold uppercase text-[9px] ${
+                          task.status === "done"
+                            ? "bg-emerald-950/40 text-emerald-400 border border-emerald-500/30"
+                            : task.status === "in_progress"
+                            ? "bg-amber-950/40 text-amber-400 border border-amber-500/30"
+                            : "bg-surface border border-border text-muted"
+                        }`}
+                      >
+                        {task.status.replace("_", " ")}
+                      </span>
+
                       {task.assignee && (
                         <span className="flex items-center gap-1 text-emerald-400 font-semibold bg-emerald-950/30 px-1.5 py-0.5 rounded border border-emerald-500/20">
                           <UserCheck className="w-3 h-3" /> {task.assignee.name}
@@ -265,12 +336,19 @@ export default function ProductionTab({ creationId }: { creationId: string }) {
                           {fmt(task.startDate)} {task.dueDate ? `→ ${fmt(task.dueDate)}` : ""}
                         </span>
                       )}
+
+                      {task.completedAt && (
+                        <span className="flex items-center gap-1 text-emerald-400/80">
+                          <Clock className="w-3 h-3" /> Done {fmt(task.completedAt)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <button
                   onClick={() => removeTask(task.id)}
+                  title="Delete task"
                   className="p-1.5 text-muted hover:text-red-400 transition-colors shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

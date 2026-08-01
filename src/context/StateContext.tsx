@@ -46,23 +46,39 @@ export function StateProvider({ children }: { children: React.ReactNode }) {
   const [dumpItems, setDumpItems] = useState<DumpItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const [dbUser, setDbUser] = useState<UserProfile | null>(null);
+
   const user: UserProfile | null = session?.user
     ? {
-        name: session.user.name ?? "Traveler",
-        title: session.user.title ?? "Traveler",
-        joinedAt: "",
-        role: session.user.role,
+        name: dbUser?.name ?? session.user.name ?? "Traveler",
+        title: dbUser?.title ?? session.user.title ?? "Traveler",
+        joinedAt: dbUser?.joinedAt ?? "",
+        role: dbUser?.role ?? session.user.role ?? "user",
       }
     : null;
 
   const refresh = useCallback(async () => {
     if (status !== "authenticated") return;
     try {
-      const res = await fetch("/api/creations", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
+      const [cRes, pRes] = await Promise.all([
+        fetch("/api/creations", { cache: "no-store" }),
+        fetch("/api/profile", { cache: "no-store" }),
+      ]);
+      if (cRes.ok) {
+        const data = await cRes.json();
         setCreations(data.creations ?? []);
         setDumpItems(data.dumpItems ?? []);
+      }
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        if (pData.user) {
+          setDbUser({
+            name: pData.user.name ?? "Traveler",
+            title: pData.user.title ?? "Traveler",
+            joinedAt: pData.user.created_at ?? "",
+            role: pData.user.role ?? "user",
+          });
+        }
       }
     } catch (err) {
       console.error("Failed to load Grove data:", err);
