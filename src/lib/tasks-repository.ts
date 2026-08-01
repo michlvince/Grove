@@ -43,16 +43,33 @@ function mapTask(row: TaskRow): Task {
 
 export async function getTasks(userId: string, creationId: string): Promise<Task[]> {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tasks")
-    .select(`
-      *,
-      assignee:users!tasks_assignee_id_fkey(id, name, email)
-    `)
+    .select("*")
     .eq("creation_id", creationId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
-  return ((data ?? []) as TaskRow[]).map(mapTask);
+
+  if (error || !data) return [];
+
+  // Fetch assignees manually for any task with assignee_id
+  const assigneeIds = Array.from(new Set(data.map((t) => t.assignee_id).filter(Boolean)));
+  let usersMap: Record<string, { id: string; name: string; email: string }> = {};
+
+  if (assigneeIds.length > 0) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, name, email")
+      .in("id", assigneeIds);
+
+    if (usersData) {
+      for (const u of usersData) {
+        usersMap[u.id] = u;
+      }
+    }
+  }
+
+  return data.map((t) => mapTask({ ...t, assignee: t.assignee_id ? usersMap[t.assignee_id] ?? null : null }));
 }
 
 export async function createTask(
@@ -77,7 +94,7 @@ export async function createTask(
     .maybeSingle();
   const nextOrder = (maxRow?.sort_order ?? -1) + 1;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tasks")
     .insert({
       creation_id: creationId,
@@ -89,13 +106,25 @@ export async function createTask(
       due_date: input.dueDate ?? null,
       sort_order: nextOrder,
     })
-    .select(`
-      *,
-      assignee:users!tasks_assignee_id_fkey(id, name, email)
-    `)
+    .select()
     .single();
 
-  return data ? mapTask(data as TaskRow) : null;
+  if (error || !data) {
+    console.error("[tasks-repository] createTask insert error:", error);
+    return null;
+  }
+
+  let assignee = null;
+  if (data.assignee_id) {
+    const { data: userData } = await supabase
+      .from("users")
+      .select("id, name, email")
+      .eq("id", data.assignee_id)
+      .single();
+    if (userData) assignee = userData;
+  }
+
+  return mapTask({ ...(data as any), assignee });
 }
 
 export async function updateTask(
