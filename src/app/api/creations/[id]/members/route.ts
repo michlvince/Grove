@@ -98,13 +98,14 @@ export async function POST(
     .from("creations")
     .select("user_id")
     .eq("id", creationId)
-    .single();
+    .maybeSingle();
 
   if (fetchErr || !creation) {
+    console.error("[members POST] Creation fetch error:", fetchErr);
     return NextResponse.json({ error: "Creation not found" }, { status: 404 });
   }
   if (creation.user_id !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden. Only creation owner can assign roles." }, { status: 403 });
   }
 
   let body: { userId: string; role: "owner" | "admin" | "member"; deadline?: string; rewardXp?: number; rewardText?: string };
@@ -162,6 +163,7 @@ export async function POST(
         .select();
 
       if (updErr) {
+        console.error("[members POST] Update error:", updErr);
         return NextResponse.json({ error: updErr.message }, { status: 500 });
       }
       result = updated?.[0];
@@ -176,9 +178,26 @@ export async function POST(
         .select();
 
       if (insErr) {
-        return NextResponse.json({ error: insErr.message }, { status: 500 });
+        console.error("[members POST] Insert error:", insErr);
+        // Fallback: try essential columns insert if schema lacks extended columns
+        const basicData = {
+          creation_id: creationId,
+          user_id: userId,
+          role,
+        };
+        const { data: fallback, error: fbErr } = await supabase
+          .from("creation_members")
+          .insert(basicData)
+          .select();
+
+        if (fbErr) {
+          console.error("[members POST] Fallback insert error:", fbErr);
+          return NextResponse.json({ error: fbErr.message }, { status: 500 });
+        }
+        result = fallback?.[0];
+      } else {
+        result = inserted?.[0];
       }
-      result = inserted?.[0];
     }
 
     // Send automatic Push Notification to assigned member (if VAPID configured)
