@@ -40,5 +40,21 @@ export async function POST(req: Request) {
   if (!task) {
     return NextResponse.json({ error: "Creation not found" }, { status: 404 });
   }
+
+  // Send push notification if task was assigned to someone else
+  if (task.assigneeId && task.assigneeId !== session.user.id) {
+    try {
+      const { sendPushToUser } = await import("@/lib/web-push");
+      await sendPushToUser(task.assigneeId, {
+        title: "New Task Assigned! 📋",
+        body: `You were assigned task "${task.title}".`,
+        url: `/creation/${creationId}`,
+        tag: `task-assigned-${task.id}`,
+      });
+    } catch (err) {
+      console.log("[tasks POST] Push notification skipped or unconfigured:", err);
+    }
+  }
+
   return NextResponse.json({ task }, { status: 201 });
 }

@@ -153,35 +153,56 @@ export async function POST(
   };
 
   let result;
-  if (existingMember) {
-    // Update existing
-    const { data: updated, error: updErr } = await supabase
-      .from("creation_members")
-      .update(upsertData)
-      .eq("id", existingMember.id)
-      .select()
-      .single();
+  try {
+    if (existingMember) {
+      const { data: updated, error: updErr } = await supabase
+        .from("creation_members")
+        .update(upsertData)
+        .eq("id", existingMember.id)
+        .select();
 
-    if (updErr) {
-      return NextResponse.json({ error: updErr.message }, { status: 500 });
-    }
-    result = updated;
-  } else {
-    // Insert new
-    const insertData = {
-      ...upsertData,
-      created_at: new Date().toISOString(),
-    };
-    const { data: inserted, error: insErr } = await supabase
-      .from("creation_members")
-      .insert(insertData)
-      .select()
-      .single();
+      if (updErr) {
+        return NextResponse.json({ error: updErr.message }, { status: 500 });
+      }
+      result = updated?.[0];
+    } else {
+      const insertData = {
+        ...upsertData,
+        created_at: new Date().toISOString(),
+      };
+      const { data: inserted, error: insErr } = await supabase
+        .from("creation_members")
+        .insert(insertData)
+        .select();
 
-    if (insErr) {
-      return NextResponse.json({ error: insErr.message }, { status: 500 });
+      if (insErr) {
+        return NextResponse.json({ error: insErr.message }, { status: 500 });
+      }
+      result = inserted?.[0];
     }
-    result = inserted;
+
+    // Send automatic Push Notification to assigned member (if VAPID configured)
+    try {
+      const { sendPushToUser } = await import("@/lib/web-push");
+      const { data: creationData } = await supabase
+        .from("creations")
+        .select("title")
+        .eq("id", creationId)
+        .maybeSingle();
+
+      const projTitle = creationData?.title ?? "a project";
+      await sendPushToUser(userId, {
+        title: "You were assigned to a project! 🚀",
+        body: `You've been assigned as ${role} on "${projTitle}".`,
+        url: `/creation/${creationId}`,
+        tag: `member-assigned-${creationId}`,
+      });
+    } catch (pushErr) {
+      // Don't fail the API call if web push keys aren't configured yet
+      console.log("[members POST] Push notification skipped or unconfigured:", pushErr);
+    }
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to save member" }, { status: 500 });
   }
 
   return NextResponse.json({ member: result }, { status: 201 });
