@@ -94,18 +94,23 @@ export async function createTask(
     .maybeSingle();
   const nextOrder = (maxRow?.sort_order ?? -1) + 1;
 
+  const payload: Record<string, any> = {
+    creation_id: creationId,
+    user_id: userId,
+    title: input.title,
+    priority: input.priority ?? "medium",
+    start_date: input.startDate ?? null,
+    due_date: input.dueDate ?? null,
+    sort_order: nextOrder,
+  };
+
+  if (input.assigneeId) {
+    payload.assignee_id = input.assigneeId;
+  }
+
   const { data, error } = await supabase
     .from("tasks")
-    .insert({
-      creation_id: creationId,
-      user_id: userId,
-      assignee_id: input.assigneeId ?? null,
-      title: input.title,
-      priority: input.priority ?? "medium",
-      start_date: input.startDate ?? null,
-      due_date: input.dueDate ?? null,
-      sort_order: nextOrder,
-    })
+    .insert(payload)
     .select()
     .single();
 

@@ -19,7 +19,7 @@ export async function GET(
   const { id: creationId } = await params;
   const supabase = createAdminClient();
 
-  // Verify that the requester is the creator of the creation
+  // Check if creation exists
   const { data: creation, error: fetchErr } = await supabase
     .from("creations")
     .select("user_id")
@@ -29,29 +29,50 @@ export async function GET(
   if (fetchErr || !creation) {
     return NextResponse.json({ error: "Creation not found" }, { status: 404 });
   }
-  if (creation.user_id !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   // Fetch members
   const { data: members, error } = await supabase
     .from("creation_members")
-    .select(`
-      id,
-      role,
-      deadline,
-      reward_xp,
-      reward_text,
-      user:users!creation_members_user_id_fkey(id, name, title, image)
-    `)
+    .select("*")
     .eq("creation_id", creationId)
     .order("created_at");
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[members route] error:", error);
+    return NextResponse.json({ members: [] });
   }
 
-  return NextResponse.json({ members });
+  if (!members || members.length === 0) {
+    return NextResponse.json({ members: [] });
+  }
+
+  // Map users manually
+  const userIds = Array.from(new Set(members.map((m) => m.user_id).filter(Boolean)));
+  let usersMap: Record<string, any> = {};
+
+  if (userIds.length > 0) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, name, title, image, email")
+      .in("id", userIds);
+
+    if (usersData) {
+      for (const u of usersData) {
+        usersMap[u.id] = u;
+      }
+    }
+  }
+
+  const mappedMembers = members.map((m) => ({
+    id: m.id,
+    role: m.role,
+    deadline: m.deadline,
+    reward_xp: m.reward_xp,
+    reward_text: m.reward_text,
+    user: usersMap[m.user_id] ?? { id: m.user_id, name: "Member", title: "", image: null, email: "" },
+  }));
+
+  return NextResponse.json({ members: mappedMembers });
 }
 
 /**
