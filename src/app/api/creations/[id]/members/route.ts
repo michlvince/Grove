@@ -128,19 +128,19 @@ export async function POST(
     .from("users")
     .select("id")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (userErr || !targetUser) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   // Check if already a member (to upsert)
-  const { data: existingMember, error: existErr } = await supabase
+  const { data: existingMember } = await supabase
     .from("creation_members")
     .select("id")
     .eq("creation_id", creationId)
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   let upsertData: any = {
     creation_id: creationId,
